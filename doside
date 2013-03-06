@@ -1,0 +1,41 @@
+#!/bin/bash
+
+set -x
+
+# start "side stream" tests
+cd $HOME
+
+BASE=$HOME/VAR/www
+mynode=`cat $HOME/VAR/MYNODE`
+
+# This is a whole lot easier...
+killall tdump8000.py
+killall exitstats.py
+
+if [ ! -f .sidedone2 ]; then
+   rm -f .sidedone*
+   mkdir -p $BASE/Sample
+   (cd $BASE/Sample; mkSample.py)
+   mkdir -p $BASE/SideStream
+   sudo chown root.root /usr/sbin/tcpdump
+   sudo chmod 4755 /usr/sbin/tcpdump
+
+   (cd $BASE/SideStream;  # ONCE
+       for dir in */*/*;
+       do
+	   mkdir -p $dir/$mynode
+	   mv $dir/*.web100 $dir/$mynode/
+	   mv $dir/*.tra $dir/$mynode/
+       done
+   )
+   touch .sidedone2
+fi
+
+LOGF=$HOME/VAR/logs/SideStream.log
+rm -f $LOGF
+(
+cd $BASE/SideStream
+date
+exitstats.py $mynode &
+tdump8000.py $mynode &
+) >> $LOGF 2>&1
