@@ -6,6 +6,8 @@ set -x
 cd $HOME
 
 BASE=$HOME/VAR/www
+source $HOME/conf/config.sh
+BASE=$RSYNCDIR
 mynode=`cat $HOME/VAR/MYNODE`
 
 # This is a whole lot easier...
@@ -23,9 +25,11 @@ if [ ! -f .sidedone2 ]; then
    (cd $BASE/SideStream;  # ONCE
        for dir in */*/*;
        do
+	[ "$dir" != '*/*/*' ] && (
 	   mkdir -p $dir/$mynode
 	   mv $dir/*.web100 $dir/$mynode/
 	   mv $dir/*.tra $dir/$mynode/
+	)
        done
    )
    touch .sidedone2
