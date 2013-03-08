@@ -21,16 +21,6 @@ if [ ! -f .sidedone2 ]; then
    sudo chown root.root /usr/sbin/tcpdump
    sudo chmod 4755 /usr/sbin/tcpdump
 
-   (cd $BASE/SideStream;  # ONCE
-       for dir in */*/*;
-       do
-	[ "$dir" != '*/*/*' ] && (
-	   mkdir -p $dir/$mynode
-	   mv $dir/*.web100 $dir/$mynode/
-	   mv $dir/*.tra $dir/$mynode/
-	)
-       done
-   )
    touch .sidedone2
 fi
 
