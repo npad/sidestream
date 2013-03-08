@@ -5,7 +5,6 @@ set -x
 # start "side stream" tests
 cd $HOME
 
-BASE=$HOME/VAR/www
 source $HOME/conf/config.sh
 BASE=$RSYNCDIR
 mynode=`cat $HOME/VAR/MYNODE`
