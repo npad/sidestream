@@ -31,4 +31,5 @@ cd $BASE/SideStream
 date
 exitstats.py $mynode &
 tdump8000.py $mynode &
+paris-traceroute.py $mynode &
 ) >> $LOGF 2>&1
