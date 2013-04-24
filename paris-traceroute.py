@@ -8,6 +8,7 @@ the remote address to a log file.
 print "Starting paris-traceroute"
 
 from Web100 import *
+import errno
 import os
 import subprocess
 import sys
@@ -15,17 +16,12 @@ import time
 
 def mkdirs(name):
     """ Fake mkdir -p """
-    cp=0
-    while True:
-        cp=name.find("/",cp+1)
-        if cp < 0:
-            return
-        dirname=name[0:cp]
-        try:
-            os.mkdir(dirname)
-        except OSError, e:
-            if e[0] != 17:   # ignore "exists"
-                raise e
+    try:
+      os.makedirs(path)
+    except OSError as exc:
+      if exc.errno == errno.EEXIST and os.path.isdir(path):
+        pass
+      else: raise
 
 def postproc(dir):
     """ Remove all write permissions, compute md5sums, etc """
