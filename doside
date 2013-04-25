@@ -10,6 +10,7 @@ BASE=$RSYNCDIR
 mynode=`cat $HOME/VAR/MYNODE`
 
 # This is a whole lot easier...
+killall paris-traceroute.py
 killall tdump8000.py
 killall exitstats.py
 
@@ -18,6 +19,7 @@ if [ ! -f .sidedone2 ]; then
    mkdir -p $BASE/Sample
    (cd $BASE/Sample; mkSample.py)
    mkdir -p $BASE/SideStream
+   mkdir -p $BASE/paris-traceroute
    sudo chown root.root /usr/sbin/tcpdump
    sudo chmod 4755 /usr/sbin/tcpdump
 
@@ -31,5 +33,11 @@ cd $BASE/SideStream
 date
 exitstats.py $mynode &
 tdump8000.py $mynode &
+) >> $LOGF 2>&1
+
+LOGF=$HOME/VAR/logs/paris-traceroute.log
+rm -f $LOGF
+(
+cd $BASE/paris-traceroute
 paris-traceroute.py $mynode &
 ) >> $LOGF 2>&1
