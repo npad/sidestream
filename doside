@@ -16,8 +16,6 @@ killall exitstats.py
 
 if [ ! -f .sidedone2 ]; then
    rm -f .sidedone*
-   mkdir -p $BASE/Sample
-   (cd $BASE/Sample; mkSample.py)
    mkdir -p $BASE/SideStream
    mkdir -p $BASE/paris-traceroute
    sudo chown root.root /usr/sbin/tcpdump
