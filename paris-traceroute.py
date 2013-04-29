@@ -17,9 +17,9 @@ import time
 def mkdirs(name):
     """ Fake mkdir -p """
     try:
-      os.makedirs(path)
+      os.makedirs(name)
     except OSError as exc:
-      if exc.errno == errno.EEXIST and os.path.isdir(path):
+      if exc.errno == errno.EEXIST and os.path.isdir(name):
         pass
       else: raise
 
@@ -39,10 +39,10 @@ def getlogf(t):
     logdir = time.strftime("%Y/%m/%d/", time.gmtime(t))
     if olddir and olddir!=logdir:
         postproc(olddir)
-        mkdirs(logdir)
+    mkdirs(logdir+server)
     logname = time.strftime("%Y/%m/%d/%%s%Y%m%dT%TZ_ALL%%d.paris",
                             time.gmtime(t)) % (server, logc)
-    ++logc
+    logc+=1
     return open(logname, "a")
 
 def do_traceroute(rem_address):
@@ -56,35 +56,75 @@ def do_traceroute(rem_address):
     t = time.time()
     logf = getlogf(t)
 
-    process = subprocess.Popen(["paris-traceroute","--algo=exhaustive",rem_address],
+    process = subprocess.Popen(["paris-traceroute","-picmp","--algo=exhaustive",rem_address],
                                stdout = subprocess.PIPE)
-    logf.write(process.communicate())
+    (so,se) = process.communicate()
+    logf.write(so)
     logf.write("\n")
     logf.close()
 
-# Main
-if len(sys.argv) == 1:
-    server=""
-elif len(sys.argv) == 2:
-    server=sys.argv[1]+"/"
-else:
-    print "Usage: %s [server_name]" % sys.argv[0]
-    sys.exit()
 
-while True:
-    a = Web100Agent()
-    closed=[]
-    cl = a.all_connections()
-    newclosed=[]
-    for c in cl:
-        try:
-            if c.read('State') == 1:
-                newclosed.append(c.cid)
-                if not c.cid in closed:
-                    do_traceroute(c.read("RemAddress"))
-        except Exception, e:
-            print "Exception:", e
-            pass
-    closed = newclosed;
-    time.sleep(5)
+CACHE_WINDOW=60*10  # 10 minutes
+def ip_is_recent(arg):
+    (ip,ts) = arg
+    current_ts = time.time()
+    if current_ts > ts + CACHE_WINDOW:
+        return False
+    return True
 
+class RecentList:
+    def __init__(self):
+        self.iplist=[]
+
+    def clean(self):
+        self.iplist = filter(ip_is_recent, self.iplist)
+
+    def add(self, remote_ip):
+        self.clean()
+        self.iplist.append((remote_ip, time.time()))
+
+    def contain(self, remote_ip):
+        self.clean()
+        for ip,ts in self.iplist:
+            if remote_ip == ip: return True
+        return False
+        
+server=""
+def main():
+    # Main
+    global server
+    if len(sys.argv) == 1:
+        server=""
+    elif len(sys.argv) == 2:
+        server=sys.argv[1]+"/"
+    else:
+        print "Usage: %s [server_name]" % sys.argv[0]
+        sys.exit()
+
+    recent_ips = RecentList()
+
+    while True:
+        a = Web100Agent()
+        closed=[]
+        cl = a.all_connections()
+        newclosed=[]
+        for c in cl:
+            try:
+                if c.read('State') == 1:
+                    newclosed.append(c.cid)
+                    if not c.cid in closed:
+                        rem_ip = c.read("RemAddress")
+                        if not recent_ips.contain(rem_ip):
+                            print "Running trace to: %s" % rem_ip
+                            do_traceroute(rem_ip)
+                            recent_ips.add(rem_ip)
+                        #else:
+                        #    print "Skipping: %s" % rem_ip
+            except Exception, e:
+                print "Exception:", e
+                pass
+        closed = newclosed;
+        time.sleep(5)
+
+if __name__ == "__main__":
+    main()
