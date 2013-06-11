@@ -88,7 +88,26 @@ class RecentList:
         for ip,ts in self.iplist:
             if remote_ip == ip: return True
         return False
-        
+
+def is_valid_ipv4_address(address):
+  try:
+    socket.inet_pton(socket.AF_INET, address)
+  except AttributeError:
+    try:
+      socket.inet_aton(address)
+    except socket.error:
+      return False
+  except socket.error:
+    return False
+  return True
+
+def is_valid_ipv6_address(address):
+  try:
+    socket.inet_pton(socket.AF_INET6, address)
+  except socket.error:
+    return False
+  return True
+
 server=""
 def main():
     # Main
@@ -114,7 +133,7 @@ def main():
                     newclosed.append(c.cid)
                     if not c.cid in closed:
                         rem_ip = c.read("RemAddress")
-                        if not recent_ips.contain(rem_ip):
+                        if is_valid_ipv4_address(rem_ip) and not recent_ips.contain(rem_ip):
                             print "Running trace to: %s" % rem_ip
                             do_traceroute(rem_ip)
                             recent_ips.add(rem_ip)
