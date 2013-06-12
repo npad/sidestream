@@ -105,6 +105,10 @@ def is_valid_ipv4_address(address):
 def is_valid_ipv6_address(address):
   try:
     socket.inet_pton(socket.AF_INET6, address)
+  except AttributeError:
+    # This is the case if socket doesn't support IPv6, so it's not strictly
+    # accurate to return False, but it is conservative.
+    return False
   except socket.error:
     return False
   return True
