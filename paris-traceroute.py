@@ -10,6 +10,7 @@ print "Starting paris-traceroute"
 from Web100 import *
 import errno
 import os
+import socket
 import subprocess
 import sys
 import time
