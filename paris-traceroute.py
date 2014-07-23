@@ -127,8 +127,10 @@ def main():
 
     recent_ips = RecentList()
 
+    # Moving "a = Web100Agent()" above "while True" per
+    # OTI issue #575: Debug paris-traceroute - salarcon215
+    a = Web100Agent()
     while True:
-        a = Web100Agent()
         closed=[]
         cl = a.all_connections()
         newclosed=[]
