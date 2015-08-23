@@ -36,10 +36,9 @@ def log_worker(message):
 
 def make_log_file_name(log_time, log_file_root, remote_ip, remote_port,
                        local_ip, local_port):
-  log_file_relative = (time.strftime('%Y/%m/%d/%Y%m%dT%TZ%%s.paris',
-                                     time.gmtime(log_time)) %
-                       ('-'.join((remote_ip, str(remote_port),
-                                  local_ip, str(local_port)))))
+  log_time = time.strftime('%Y/%m/%d/%Y%m%dT%TZ', time.gmtime(log_time))
+  log_ip = '-'.join((remote_ip, str(remote_port), local_ip, str(local_port)))
+  log_file_relative = ''.join((log_time, log_ip, '.paris'))
   log_file = os.path.join(log_file_root, log_file_relative)
   return log_file
 
@@ -53,7 +52,7 @@ def run_worker(log_file_root, log_time, remote_ip, remote_port,
   command = (
     '/usr/bin/timeout',
     str(WORKER_TIMEOUT) + 's',
-    '/usr/local/bin/paris-traceroute',
+    PARIS_TRACEROUTE,
     '--algo=exhaustive',
     '-picmp',
     remote_ip,
@@ -79,8 +78,7 @@ def run_worker(log_file_root, log_time, remote_ip, remote_port,
     return
   log_worker('traceroute to %s' % remote_ip)
   try:
-    returncode = subprocess.call(
-      command, shell=False, stdout=log_file, stderr=None)
+    returncode = subprocess.call(command, stdout=log_file)
     log_file.close()
     if returncode != 0:
       log_worker('%s returned %d' % (log_command, returncode))
