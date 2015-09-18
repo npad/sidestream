@@ -100,38 +100,41 @@ class RecentIPAddressCache(object):
     self.address_cache_time_buckets = {}
 
   # Expire all addresses up to 2 cache timeout periods ago.
-  def expire(self, now_bucket):
-    expire_buckets = [] 
+  def expire(self, now):
+    expire_buckets = []
     for bucket in self.address_cache_time_buckets.keys():
-      if bucket < now_bucket - 1:
+      if bucket + self.cache_timeout < now:
         expire_buckets.append(bucket)
     for bucket in expire_buckets:
       for address in self.address_cache_time_buckets[bucket]:
         del self.address_cache[address]
       del self.address_cache_time_buckets[bucket]
 
+  # Add an IP to the cache, if it isn't there already.
+  def add(self, address):
+    if not self.cached(address):
+      # Not in the cache or stale entry, so add a new entry.
+      now = time.time()
+      self.address_cache[address] = now
+      if now not in self.address_cache_time_buckets:
+        self.address_cache_time_buckets[now] = set()
+        self.address_cache_time_buckets[now].add(address)
+
   # Returns true if an address seen without one timeout period.
-  def isrecent(self, address):
+  def cached(self, address):
     now = time.time()
-    now_bucket = now % self.cache_timeout
-    expired_age = now - self.cache_timeout
-    self.expire(now_bucket)
+    self.expire(now)
     # If in the cache...
     if address in self.address_cache:
       age = self.address_cache[address]
+      expired_age = now - self.cache_timeout
       if age > expired_age:
         return True
       else:
-        # Stale entry, we need to refresh.
-        stale_bucket = age % self.cache_timeout
-        self.address_cache_time_buckets[stale_bucket].remove(address)
-    # Not in the cache or stale entry, so add a new entry.
-    self.address_cache[address] = now
-    if now_bucket not in self.address_cache_time_buckets:
-      self.address_cache_time_buckets[now_bucket] = set()  
-    self.address_cache_time_buckets[now_bucket].add(address)
+        # Expired.
+        self.address_cache_time_buckets[age].remove(address)
+        del self.address_cache[address]
     return False
-
 
 # Manage a pool of worker subprocessors to run traceoutes in.
 class ParisTraceroutePool(object):

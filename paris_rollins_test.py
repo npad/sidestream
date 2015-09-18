@@ -56,8 +56,9 @@ class ParisRollinsTestCase(unittest.TestCase):
     cache_timeout = 2
     cache = paris_rollins.RecentIPAddressCache(cache_timeout)
     for cache_refreshes in range(3):
-      self.assertFalse(cache.isrecent(ip))
-      self.assertTrue(cache.isrecent(ip))
+      self.assertFalse(cache.cached(ip))
+      cache.add(ip)
+      self.assertTrue(cache.cached(ip))
       time.sleep(cache_timeout)
 
 
