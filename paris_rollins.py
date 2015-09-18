@@ -124,17 +124,7 @@ class RecentIPAddressCache(object):
   def cached(self, address):
     now = time.time()
     self.expire(now)
-    # If in the cache...
-    if address in self.address_cache:
-      age = self.address_cache[address]
-      expired_age = now - self.cache_timeout
-      if age > expired_age:
-        return True
-      else:
-        # Expired.
-        self.address_cache_time_buckets[age].remove(address)
-        del self.address_cache[address]
-    return False
+    return address in self.address_cache
 
 # Manage a pool of worker subprocessors to run traceoutes in.
 class ParisTraceroutePool(object):
