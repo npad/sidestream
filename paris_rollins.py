@@ -134,10 +134,18 @@ class ParisTraceroutePool(object):
     self.log_file_root = log_file_root
     self.busy = []
 
+  def update_busy(self):
+    self.busy = [result for result in self.busy if result.ready() == False]
+
   # Return true if we have capacity to run more traceroutes.
   def free(self):
-    self.busy = [result for result in self.busy if result.ready() == False]
+    self.update_busy()
     return len(self.busy) < MAX_WORKERS
+
+  # Return true if no workers running.
+  def idle(self):
+    self.update_busy()
+    return len(self.busy) == 0
 
   # Return true if we have spare capacity and we scheduled a traceroute.
   def run_async(self, log_time, remote_ip, remote_port, local_ip, local_port):

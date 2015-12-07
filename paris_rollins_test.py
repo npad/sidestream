@@ -4,6 +4,7 @@
 # paris-traceroute.
 
 import os
+import re
 import shutil
 import tempfile
 import time
@@ -11,6 +12,10 @@ import unittest
 import paris_rollins as paris_rollins
 
 class ParisRollinsTestCase(unittest.TestCase):
+  # We would prefer to use a local IP, but paris traceroute doesn't
+  # let us choose which interface the test runs on - and doesn't
+  # necessarily use the loopback interface for tests to 127.0.0.1
+  TEST_DEST_IP = '8.8.8.8'
 
   def setUp(self):
     self.tmpdir = tempfile.mkdtemp()
@@ -22,7 +27,7 @@ class ParisRollinsTestCase(unittest.TestCase):
     pool = paris_rollins.ParisTraceroutePool(self.tmpdir)
     local_ip = '127.0.0.1'
     base_local_port = 33457
-    remote_ip = '127.0.0.1'
+    remote_ip = self.TEST_DEST_IP
     remote_port = 9999
     # run full complement of workers, repeatedly.
     for log_time in range(5):
@@ -33,7 +38,7 @@ class ParisRollinsTestCase(unittest.TestCase):
       # should be able to launch parallel traceroutes
       self.assertTrue(workers > 2)
       # wait until all traceroutes finish
-      while not pool.free():
+      while not pool.idle():
         time.sleep(1)
       # ensure all log files exist and have expected contents.
       for worker in range(workers):
@@ -45,14 +50,14 @@ class ParisRollinsTestCase(unittest.TestCase):
                                            local_ip, local_port))
         self.assertTrue(os.path.isfile(expected_log))
         self.assertTrue(os.path.getsize(expected_log) > 0)
-        expected_log_header = (
-          'traceroute [(%s:%u) -> (%s:%u)], protocol icmp, algo exhaustive' % (
-              local_ip, local_port, remote_ip, remote_port))
+        expected_log_header = re.compile(
+          'traceroute \[\(%s:%u\) -> \(%s:%u\)\], protocol icmp, algo exhaustive' % (
+              '([\d\.]+)', local_port, remote_ip, remote_port))
         log_contents = open(expected_log).read()
-        self.assertTrue(log_contents.startswith(expected_log_header))
+        self.assertEquals(1, len(expected_log_header.match(log_contents).groups()))
 
   def test_recentcache(self):
-    ip = '127.0.0.1'
+    ip = self.TEST_DEST_IP 
     cache_timeout = 2
     cache = paris_rollins.RecentIPAddressCache(cache_timeout)
     for cache_refreshes in range(3):
