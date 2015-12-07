@@ -219,5 +219,5 @@ if __name__ == '__main__':
       for log_time, remote_ip, remote_port, local_ip, local_port in connections:
           traceroute_port = PARIS_TRACEROUTE_SOURCE_PORT_BASE + pool.busy_workers()
           pool.run_async(log_time, mlab_hostname, traceroute_port,
-                         remote_ip, remote_port, local_ip, traceroute_port)
+                         remote_ip, remote_port, local_ip, local_ip)
       time.sleep(5)
