@@ -18,14 +18,14 @@
 # TODO(joshb): this is for experimental use only. The next step is to replace
 # the old wrapper with this one.
 
-from Web100 import *
-import os
 import multiprocessing
+import os
 import platform
 import re
 import subprocess
 import sys
 import time
+import Web100
 
 # What binary to use for paris-traceroute
 PARIS_TRACEROUTE_BIN = '/usr/local/bin/paris-traceroute'
@@ -35,7 +35,7 @@ TIMEOUT_BIN = '/usr/bin/timeout'
 WORKER_NICE = 19
 # paris-traceroute should take no longer than this to complete (timed out,
 # partial results will be discarded).
-WORKER_TIMEOUT = 30 
+WORKER_TIMEOUT = 60 
 # Maximum number of paris-traceoutes to run simultaneously (requests to run
 # more will be discarded).
 MAX_WORKERS = 10
@@ -49,7 +49,13 @@ PARIS_TRACEROUTE_SOURCE_PORT_BASE = 33457
 LOG_PATH = '/tmp'
 # Do not traceroute to an IP more than once in this many seconds
 IP_CACHE_TIME_SECONDS = 120
-
+# Don't traceroute to these networks.
+# TODO(joshb): would be nice to use IP address library, but it isn't installed
+# on M-Lab.
+IGNORE_IPV4_NETS = (
+  '127.', # localhost
+  '128.112.139.', # PLC control
+)
 
 
 def log_worker(message):
@@ -182,37 +188,55 @@ class ParisTraceroutePool(object):
     return False
 
 
+# return true if should ignore an IP address (eg localhost) 
+def ignore_ip(ip):
+  for net in IGNORE_IPV4_NETS:
+    if ip.startswith(net):
+      return True
+  return False
+
+
+# return list of recently closed connections, not already considered.
 def uncached_closed_connections(agent, recent_ip_cache):
    closed_connections = [] 
    for connection in agent.all_connections():
-     state = connection.read('State')
-     remote_ip = connection.read('RemAddress')
-     address_type = connection.read('LocalAddressType')
+     try:
+       state = connection.read('State')
+       remote_ip = connection.read('RemAddress')
+       remote_port = connection.read('RemPort')
+       local_ip = connection.read('LocalAddress')
+       local_port = connection.read('LocalPort')
+       address_type = connection.read('LocalAddressType')
+     except Web100.error:
+       continue
 
      if (state == WEB100_STATE_CLOSED and
          address_type == WEB100_IPV4 and
+         not ignore_ip(remote_ip) and
          not recent_ip_cache.cached(remote_ip)):
-         recent_ip_cache.add(remote_ip)
-         log_time = time.time()
-         remote_port = connection.read('RemPort')
-         local_ip = connection.read('LocalAddress')
-         local_port = connection.read('LocalPort')
-         closed_connections.append((
-             log_time, remote_ip, remote_port, local_ip, local_port))
+       recent_ip_cache.add(remote_ip)
+       log_time = time.time()
+       closed_connections.append((
+           log_time, remote_ip, remote_port, local_ip, local_port))
    return closed_connections
 
 
+# return short version (mlabN.xyzNN) of hostname, if an M-Lab host
+# otherwise return just hostname
 def get_mlab_hostname():
+   hostname = platform.node()
    mlab_pattern = re.compile('^(mlab\d+\.[a-z]{3,3}\d+)')
-   mlab_hostname = mlab_pattern.match(platform.node()).group(1)
-   return mlab_hostname
+   mlab_match = mlab_pattern.match(hostname)
+   if mlab_match is not None:
+     return mlab_match.group(1)
+   return hostname
 
            
 if __name__ == '__main__':
     mlab_hostname = get_mlab_hostname()
-    agent = Web100Agent()
     recent_ip_cache = RecentIPAddressCache(IP_CACHE_TIME_SECONDS)
     pool = ParisTraceroutePool(LOG_PATH)
+    agent = Web100.Web100Agent()
 
     while True:
       connections = uncached_closed_connections(agent, recent_ip_cache)
