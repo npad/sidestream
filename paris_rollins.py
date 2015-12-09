@@ -1,6 +1,7 @@
 #!/usr/bin/python2.6
 
 # Run up to a configurable limit of simultaneous paris-traceroutes, back
+
 # towards recent M-Lab client IP addresses told to us via SideStream.
 
 # TODO(joshb): this script is written to minimize external dependencies.
@@ -18,13 +19,16 @@
 # TODO(joshb): this is for experimental use only. The next step is to replace
 # the old wrapper with this one.
 
-import multiprocessing
 import os
-import platform
 import re
-import subprocess
 import sys
 import time
+
+import multiprocessing
+import optparse
+import platform
+import subprocess
+
 import Web100
 
 # What binary to use for paris-traceroute
@@ -57,6 +61,9 @@ IGNORE_IPV4_NETS = (
   '128.112.139.', # PLC control
 )
 
+optparser = optparse.OptionParser()
+optparser.add_option('-l', '--logpath', default='/tmp', help='directory to log to')
+
 
 def log_worker(message):
   print time.strftime('%Y%m%d %T %%s', time.gmtime(time.time())) % message
@@ -64,7 +71,7 @@ def log_worker(message):
 
 def make_log_file_name(log_file_root, log_time, mlab_hostname,
                        remote_ip, remote_port, local_ip, local_port):
-  time_fmt = '/'.join(('%Y/%m/%d', mlab_hostname, '%Y%m%dT%TZ'))
+  time_fmt = os.path.join('%Y', '%m', '%d', mlab_hostname, '%Y%m%dT%TZ')
   log_time = time.strftime(time_fmt, time.gmtime(log_time))
   log_ip = '-'.join((remote_ip, str(remote_port), local_ip, str(local_port)))
   log_file_relative = ''.join((log_time, '-', log_ip, '.paris'))
@@ -165,17 +172,17 @@ class ParisTraceroutePool(object):
     self.log_file_root = log_file_root
     self.busy = []
 
-  def busy_workers(self):
-    self.busy = [result for result in self.busy if result.ready() == False]
+  def busy_workers_count(self):
+    self.busy = [result for result in self.busy if not result.ready()]
     return len(self.busy)
 
   # Return true if we have capacity to run more traceroutes.
   def free(self):
-    return self.busy_workers() < MAX_WORKERS
+    return self.busy_workers_count() < MAX_WORKERS
 
   # Return true if no workers running.
   def idle(self):
-    return self.busy_workers() == 0 
+    return self.busy_workers_count() == 0 
 
   # Return true if we have spare capacity and we scheduled a traceroute.
   def run_async(self, log_time, mlab_hostname, traceroute_port,
@@ -188,7 +195,7 @@ class ParisTraceroutePool(object):
     return False
 
 
-# return true if should ignore an IP address (eg localhost) 
+# return true if should ignore an IP address (eg localhost).
 def ignore_ip(ip):
   for net in IGNORE_IPV4_NETS:
     if ip.startswith(net):
@@ -196,7 +203,7 @@ def ignore_ip(ip):
   return False
 
 
-# return list of recently closed connections, not already considered.
+# return list of recently closed connections, not already seen.
 def uncached_closed_connections(agent, recent_ip_cache):
    closed_connections = [] 
    for connection in agent.all_connections():
@@ -221,27 +228,27 @@ def uncached_closed_connections(agent, recent_ip_cache):
    return closed_connections
 
 
-# return short version (mlabN.xyzNN) of hostname, if an M-Lab host
-# otherwise return just hostname
+# Return short version (mlabN.xyzNN) of hostname, if an M-Lab host.
+# Otherwise return just hostname.
 def get_mlab_hostname():
    hostname = platform.node()
-   mlab_pattern = re.compile('^(mlab\d+\.[a-z]{3,3}\d+)')
-   mlab_match = mlab_pattern.match(hostname)
-   if mlab_match is not None:
+   mlab_match = re.match('^(mlab\d+\.[a-z]{3}\d+)', hostname) 
+   if mlab_match:
      return mlab_match.group(1)
    return hostname
 
            
 if __name__ == '__main__':
+    (options, args) = optparser.parse_args()
     mlab_hostname = get_mlab_hostname()
     recent_ip_cache = RecentIPAddressCache(IP_CACHE_TIME_SECONDS)
-    pool = ParisTraceroutePool(LOG_PATH)
+    pool = ParisTraceroutePool(options.logpath)
     agent = Web100.Web100Agent()
 
     while True:
       connections = uncached_closed_connections(agent, recent_ip_cache)
       for log_time, remote_ip, remote_port, local_ip, local_port in connections:
-          traceroute_port = PARIS_TRACEROUTE_SOURCE_PORT_BASE + pool.busy_workers()
+          traceroute_port = PARIS_TRACEROUTE_SOURCE_PORT_BASE + pool.busy_workers_count()
           pool.run_async(log_time, mlab_hostname, traceroute_port,
                          remote_ip, remote_port, local_ip, local_port)
       time.sleep(5)
