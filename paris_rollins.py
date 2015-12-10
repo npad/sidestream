@@ -49,8 +49,6 @@ WEB100_STATE_CLOSED = 1
 WEB100_IPV4 = 1
 # Base source port to use when running traceroute
 PARIS_TRACEROUTE_SOURCE_PORT_BASE = 33457
-# Where to log traceroutes
-LOG_PATH = '/tmp'
 # Do not traceroute to an IP more than once in this many seconds
 IP_CACHE_TIME_SECONDS = 120
 # Don't traceroute to these networks.
