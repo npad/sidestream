@@ -19,16 +19,15 @@
 # TODO(joshb): this is for experimental use only. The next step is to replace
 # the old wrapper with this one.
 
+import multiprocessing
+import optparse
 import os
 import re
+import subprocess
 import sys
 import time
 
-import multiprocessing
-import optparse
 import platform
-import subprocess
-
 import Web100
 
 # What binary to use for paris-traceroute
