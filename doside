@@ -36,5 +36,5 @@ tdump8000.py $mynode &
 LOGF=$HOME/VAR/logs/paris-traceroute.log
 rm -f $LOGF
 (
-paris_rollins.py $BASE/paris-traceroute &
+paris_rollins.py -l $BASE/paris-traceroute &
 ) >> $LOGF 2>&1
