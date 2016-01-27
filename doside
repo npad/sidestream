@@ -10,7 +10,7 @@ BASE=$RSYNCDIR
 mynode=`cat $HOME/VAR/MYNODE`
 
 # This is a whole lot easier...
-killall paris-traceroute.py
+killall paris_rollins.py
 killall tdump8000.py
 killall exitstats.py
 
@@ -36,6 +36,5 @@ tdump8000.py $mynode &
 LOGF=$HOME/VAR/logs/paris-traceroute.log
 rm -f $LOGF
 (
-cd $BASE/paris-traceroute
-paris-traceroute.py $mynode &
+paris_rollins.py -l $BASE/paris-traceroute &
 ) >> $LOGF 2>&1
