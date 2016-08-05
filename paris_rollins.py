@@ -9,8 +9,7 @@
 # can't use them because the M-Lab platform doesn't have them. This should
 # be revisited if the M-Lab platform is upgraded.
 
-# Needs to be run as root, with the Web100 libraries installed, in the NPAD
-# slice.
+# Needs to be run as root in the NPAD slice.
 #
 #   export PYTHONPATH=/home/iupui_npad/build/lib/python2.6/site-packages ; \
 #   export LD_LIBRARY_PATH=/home/iupui_npad/build/lib ; \
@@ -19,6 +18,8 @@
 # TODO(joshb): this is for experimental use only. The next step is to replace
 # the old wrapper with this one.
 
+import commands
+import collections
 import multiprocessing
 import optparse
 import os
@@ -28,7 +29,6 @@ import sys
 import time
 
 import platform
-import Web100
 
 # What binary to use for paris-traceroute
 PARIS_TRACEROUTE_BIN = '/usr/local/bin/paris-traceroute'
@@ -42,10 +42,6 @@ WORKER_TIMEOUT = 60
 # Maximum number of paris-traceoutes to run simultaneously (requests to run
 # more will be discarded).
 MAX_WORKERS = 10
-# Whether a TCP connection is closed.
-WEB100_STATE_CLOSED = 1
-# Whether a TCP connection was over IPv4
-WEB100_IPV4 = 1
 # Base source port to use when running traceroute
 PARIS_TRACEROUTE_SOURCE_PORT_BASE = 33457
 # Do not traceroute to an IP more than once in this many seconds
@@ -57,6 +53,8 @@ IGNORE_IPV4_NETS = (
   '127.', # localhost
   '128.112.139.', # PLC control
 )
+# The string that indicates a port is closed according to the output of ss
+SS_CLOSED = 'CLOSE-WAIT'
 
 optparser = optparse.OptionParser()
 optparser.add_option('-l', '--logpath', default='/tmp', help='directory to log to')
@@ -200,31 +198,6 @@ def ignore_ip(ip):
   return False
 
 
-# return list of recently closed connections, not already seen.
-def uncached_closed_connections(agent, recent_ip_cache):
-   closed_connections = [] 
-   for connection in agent.all_connections():
-     try:
-       state = connection.read('State')
-       remote_ip = connection.read('RemAddress')
-       remote_port = connection.read('RemPort')
-       local_ip = connection.read('LocalAddress')
-       local_port = connection.read('LocalPort')
-       address_type = connection.read('LocalAddressType')
-     except Web100.error:
-       continue
-
-     if (state == WEB100_STATE_CLOSED and
-         address_type == WEB100_IPV4 and
-         not ignore_ip(remote_ip) and
-         not recent_ip_cache.cached(remote_ip)):
-       recent_ip_cache.add(remote_ip)
-       log_time = time.time()
-       closed_connections.append((
-           log_time, remote_ip, remote_port, local_ip, local_port))
-   return closed_connections
-
-
 # Return short version (mlabN.xyzNN) of hostname, if an M-Lab host.
 # Otherwise return just hostname.
 def get_mlab_hostname():
@@ -234,17 +207,106 @@ def get_mlab_hostname():
      return mlab_match.group(1)
    return hostname
 
-           
+
+# A struct to hold all the data about a connection
+Connection = collections.namedtuple('Connection', ['remote_ip', 'remote_port',
+                                                   'local_ip', 'local_port'])
+
+def parse_ss_line(line, connections):
+  # Parse a single line of the output of ss and put the result in connections.
+  # Line looks like:
+  #  ESTAB 0 0 127.0.0.1:9557 127.0.0.1:40171
+  # or maybe
+  #  CLOSE-WAIT 1 0 2620:0:1003:413:ad1b:7f2:9992:63b2:33855 2607:f8b0:4006:808::2001:443
+  # where the fields are separated by tabs or other whitespace
+  fields = line.split()
+  if len(fields) != 5:
+    log_worker('bad line: %s' % line)
+    return
+  state, _, _, local_ip_port, remote_ip_port = fields
+  local_ip_fields = local_ip_port.rsplit(':', 1)
+  if len(local_ip_fields) != 2:
+    log_worker('bad local_ip:port string: %s' % local_ip_port)
+    return
+  local_ip, local_port = local_ip_fields
+  remote_ip_fields = remote_ip_port.rsplit(':', 1)
+  if len(remote_ip_fields) != 2:
+    log_worker('bad remote_ip:port string: %s' % remote_ip_port)
+  remote_ip, remote_port = remote_ip_fields
+  connections[Connection(remote_ip, remote_port, local_ip, local_port)] = state
+
+
+def measure_connections():
+  command = 'ss --tcp --numeric'
+  status, connection_text = commands.getstatusoutput(command)
+  if status != 0:
+    log_worker('%s failed (return code %d)' % (command, status))
+    return {}
+  lines = connection_text.splitlines()
+  if len(lines) <= 1:
+    return {}
+  connections = {}
+  # Parse each line, skipping the first line which is column headers
+  for line in lines[1:]:
+    parse_ss_line(line, connections)
+  return connections
+
+
+def is_IPv4(s):
+  fields = s.split('.')
+  if len(fields) != 4:
+    return False
+  for f in fields:
+    if not f.isdigit():
+      return False
+  return True
+
+
+class ConnectionWatcher(object):
+  def __init__(self):
+    self._connections = measure_connections()
+
+  def get_closed_connections(self):
+    # Find the connections that have been closed since the last query or are
+    # still marked as closed
+    old_connections = self._connections
+    self._connections = measure_connections()
+    closed = []
+    # a connection is closed if its status is SS_CLOSED or it isn't present
+    for conn in old_connections:
+      if conn not in self._connections:
+        closed.append(conn)
+    for conn, status in self._connections.iteritems():
+      if status.state == SS_CLOSED:
+        closed.append(conn)
+    return closed
+
+  def uncached_closed_connections(self, recent_ip_cache):
+    # return list of recently closed connections, not already seen.
+    # Filter out IPv6 addresses (TODO: support IPv6)
+    # Filter out cached addresses and update the cache
+    filtered = []
+    for conn in self.get_closed_connections():
+      if (is_IPv4(conn.remote_ip) and
+          is_IPv4(conn.local_ip) and
+          not ignore_ip(conn.remote_ip) and
+          not recent_ip_cache.cached(conn.remote_ip)):
+        recent_ip_cache.add(conn.remote_ip)
+        filtered.append(conn)
+    return filtered
+
+
 if __name__ == '__main__':
     (options, args) = optparser.parse_args()
     mlab_hostname = get_mlab_hostname()
     recent_ip_cache = RecentIPAddressCache(IP_CACHE_TIME_SECONDS)
     pool = ParisTraceroutePool(options.logpath)
-    agent = Web100.Web100Agent()
+    agent = ConnectionWatcher()
 
     while True:
-      connections = uncached_closed_connections(agent, recent_ip_cache)
-      for log_time, remote_ip, remote_port, local_ip, local_port in connections:
+      log_time = time.time()
+      connections = agent.uncached_closed_connections(recent_ip_cache)
+      for remote_ip, remote_port, local_ip, local_port in connections:
           traceroute_port = PARIS_TRACEROUTE_SOURCE_PORT_BASE + pool.busy_workers_count()
           pool.run_async(log_time, mlab_hostname, traceroute_port,
                          remote_ip, remote_port, local_ip, local_port)

@@ -69,6 +69,17 @@ class ParisRollinsTestCase(unittest.TestCase):
       self.assertTrue(cache.cached(ip))
       time.sleep(cache_timeout)
 
+  def test_parse_ss_output(self):
+    connections = {}
+    paris_rollins.parse_ss_line('ESTAB 0 0 127.0.0.1:9557 128.0.0.1:40171', connections)
+    self.assertEqual(len(connections), 1)
+    connection = paris_rollins.Connection(local_ip='127.0.0.1', local_port='9557', remote_ip='128.0.0.1', remote_port='40171')
+    self.assertTrue(connection in connections)
+    self.assertEqual(connections[connection], 'ESTAB')
+
+  def test_isIPv4(self):
+    self.assertTrue(paris_rollins.is_IPv4('127.0.0.1'))
+    self.assertFalse(paris_rollins.is_IPv4('2620:0:1003:413:ad1b:7f2:9992:63b2'))
 
 if __name__ == '__main__':
     unittest.main()
