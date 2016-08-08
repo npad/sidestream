@@ -7,6 +7,10 @@ import os
 import re
 import shutil
 import tempfile
+import thread
+import SimpleHTTPServer
+import socket
+import SocketServer
 import time
 import unittest
 import paris_rollins as paris_rollins
@@ -19,7 +23,7 @@ class ParisRollinsTestCase(unittest.TestCase):
 
   def setUp(self):
     self.tmpdir = tempfile.mkdtemp()
-  
+
   def tearDown(self):
     shutil.rmtree(self.tmpdir)
 
@@ -60,7 +64,7 @@ class ParisRollinsTestCase(unittest.TestCase):
         self.assertTrue(expected_log_header.match(log_contents) is not None)
 
   def test_recentcache(self):
-    ip = self.TEST_DEST_IP 
+    ip = self.TEST_DEST_IP
     cache_timeout = 2
     cache = paris_rollins.RecentIPAddressCache(cache_timeout)
     for cache_refreshes in range(3):
@@ -80,6 +84,55 @@ class ParisRollinsTestCase(unittest.TestCase):
   def test_isIPv4(self):
     self.assertTrue(paris_rollins.is_IPv4('127.0.0.1'))
     self.assertFalse(paris_rollins.is_IPv4('2620:0:1003:413:ad1b:7f2:9992:63b2'))
+
+
+class SocketPollingTestCase(unittest.TestCase):
+  def setUp(self):
+    self.assertTrue(paris_rollins.ignore_ip('127.0.0.1'))
+    self._cached_ignored_nets = paris_rollins.IGNORE_IPV4_NETS
+    paris_rollins.IGNORE_IPV4_NETS = ()
+    self.assertFalse(paris_rollins.ignore_ip('127.0.0.1'))
+    handler = SimpleHTTPServer.SimpleHTTPRequestHandler
+    self._server = SocketServer.TCPServer(("", 6666), handler)
+    thread.start_new_thread(self._server.serve_forever, ())
+
+  def tearDown(self):
+    paris_rollins.IGNORE_IPV4_NETS = self._cached_ignored_nets
+    self.assertTrue(paris_rollins.ignore_ip('127.0.0.1'))
+    self._server.shutdown()
+    self._server.server_close()
+
+  def test_polling(self):
+    recent_ip_cache = paris_rollins.RecentIPAddressCache(120)
+    watcher = paris_rollins.ConnectionWatcher()
+    ucc = watcher.uncached_closed_connections(recent_ip_cache)
+    for c in ucc:
+      self.assertNotEqual(int(c.local_port), 6666)
+      self.assertNotEqual(int(c.remote_port), 6666)
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect(('127.0.0.1', 6666))
+    # Must run the polling loop at least once while the socket is live.
+    ucc = watcher.uncached_closed_connections(recent_ip_cache)
+    for c in ucc:
+      self.assertNotEqual(int(c.local_port), 6666)
+      self.assertNotEqual(int(c.remote_port), 6666)
+    s.close()
+    # Now the closed socket should be discovered.
+    ucc = watcher.uncached_closed_connections(recent_ip_cache)
+    count = 0
+    # Because we are connecting both to and from 127.0.0.1, we have no way of
+    # knowing which of the two socket endpoints will appear first in the output
+    # of ss. Whichever one appears first will put 127.0.0.1 into the
+    # recent_ip_cache, and so we will miss the disappearance of the other.
+    # Therefore, we have to count the discovery of a connection with
+    # remote_port 6666 and remote_ip 127.0.0.1 as a success and we have to
+    # count the discovery of a connection with local_port 6666 and local_ip
+    # 127.0.0.1 as a success.
+    for c in ucc:
+      if int(c.local_port) == 6666 or int(c.remote_port) == 6666:
+        count += 1
+    self.assertEqual(count, 1)
+
 
 if __name__ == '__main__':
     unittest.main()

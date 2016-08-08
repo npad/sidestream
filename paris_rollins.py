@@ -277,7 +277,7 @@ class ConnectionWatcher(object):
       if conn not in self._connections:
         closed.append(conn)
     for conn, status in self._connections.iteritems():
-      if status.state == SS_CLOSED:
+      if status == SS_CLOSED:
         closed.append(conn)
     return closed
 
