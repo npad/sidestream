@@ -18,27 +18,27 @@
 # TODO(joshb): this is for experimental use only. The next step is to replace
 # the old wrapper with this one.
 
-import commands
 import collections
+import commands
 import multiprocessing
 import optparse
 import os
+import platform
 import re
 import subprocess
-import sys
 import time
-
-import platform
 
 # What binary to use for paris-traceroute
 PARIS_TRACEROUTE_BIN = '/usr/local/bin/paris-traceroute'
 # What binary to use for timeout (see comment about python/dependencies, above)
 TIMEOUT_BIN = '/usr/bin/timeout'
+# What binary to use for ss
+SS_BIN = '/usr/sbin/ss'
 # paris-traceroute is run at this nice level, to minimize impact on the host.
 WORKER_NICE = 19
 # paris-traceroute should take no longer than this to complete (timed out,
 # partial results will be discarded).
-WORKER_TIMEOUT = 60 
+WORKER_TIMEOUT = 60
 # Maximum number of paris-traceoutes to run simultaneously (requests to run
 # more will be discarded).
 MAX_WORKERS = 10
@@ -49,23 +49,23 @@ IP_CACHE_TIME_SECONDS = 120
 # Don't traceroute to these networks.
 # TODO(joshb): would be nice to use IP address library, but it isn't installed
 # on M-Lab.
-IGNORE_IPV4_NETS = (
-  '127.', # localhost
-  '128.112.139.', # PLC control
-)
+IGNORE_IPV4_NETS = ('127.',  # localhost
+                    '128.112.139.',  # PLC control
+                   )
 # The string that indicates a port is closed according to the output of ss
 SS_CLOSED = 'CLOSE-WAIT'
 
 optparser = optparse.OptionParser()
-optparser.add_option('-l', '--logpath', default='/tmp', help='directory to log to')
+optparser.add_option(
+    '-l', '--logpath', default='/tmp', help='directory to log to')
 
 
 def log_worker(message):
   print time.strftime('%Y%m%d %T %%s', time.gmtime(time.time())) % message
 
 
-def make_log_file_name(log_file_root, log_time, mlab_hostname,
-                       remote_ip, remote_port, local_ip, local_port):
+def make_log_file_name(log_file_root, log_time, mlab_hostname, remote_ip,
+                       remote_port, local_ip, local_port):
   time_fmt = os.path.join('%Y', '%m', '%d', mlab_hostname, '%Y%m%dT%TZ')
   log_time = time.strftime(time_fmt, time.gmtime(log_time))
   log_ip = '-'.join((remote_ip, str(remote_port), local_ip, str(local_port)))
@@ -80,22 +80,14 @@ def make_log_file_name(log_file_root, log_time, mlab_hostname,
 def run_worker(log_file_root, log_time, mlab_hostname, traceroute_port,
                remote_ip, remote_port, local_ip, local_port):
   os.nice(WORKER_NICE)
-  command = (
-    TIMEOUT_BIN,
-    str(WORKER_TIMEOUT) + 's',
-    PARIS_TRACEROUTE_BIN,
-    '--algo=exhaustive',
-    '-picmp',
-    '-s',
-    str(traceroute_port),
-    '-d',
-    str(remote_port),
-    remote_ip)
+  command = (TIMEOUT_BIN, str(WORKER_TIMEOUT) + 's', PARIS_TRACEROUTE_BIN,
+             '--algo=exhaustive', '-picmp', '-s', str(traceroute_port), '-d',
+             str(remote_port), remote_ip)
   log_command = ' '.join(command)
   log_worker(log_command)
-  log_file_name = make_log_file_name(
-    log_file_root, log_time, mlab_hostname,
-    remote_ip, remote_port, local_ip, local_port)
+  log_file_name = make_log_file_name(log_file_root, log_time, mlab_hostname,
+                                     remote_ip, remote_port, local_ip,
+                                     local_port)
   log_file_dir = os.path.dirname(log_file_name)
   if not os.path.exists(log_file_dir):
     try:
@@ -134,7 +126,7 @@ class RecentIPAddressCache(object):
   # Expire all addresses up to 2 cache timeout periods ago.
   def expire(self, now):
     expire_buckets = []
-    for bucket in self.address_cache_time_buckets.keys():
+    for bucket in self.address_cache_time_buckets:
       if bucket + self.cache_timeout < now:
         expire_buckets.append(bucket)
     for bucket in expire_buckets:
@@ -177,15 +169,18 @@ class ParisTraceroutePool(object):
 
   # Return true if no workers running.
   def idle(self):
-    return self.busy_workers_count() == 0 
+    return self.busy_workers_count() == 0
 
   # Return true if we have spare capacity and we scheduled a traceroute.
-  def run_async(self, log_time, mlab_hostname, traceroute_port,
-                remote_ip, remote_port, local_ip, local_port):
+  def run_async(self, log_time, mlab_hostname, traceroute_port, remote_ip,
+                remote_port, local_ip, local_port):
     if self.free():
-      self.busy.append(self.pool.apply_async(run_worker,
-        args=(self.log_file_root, log_time, mlab_hostname, traceroute_port,
-              remote_ip, remote_port, local_ip, local_port)))
+      self.busy.append(
+          self.pool.apply_async(
+              run_worker,
+              args=(self.log_file_root, log_time, mlab_hostname,
+                    traceroute_port, remote_ip, remote_port, local_ip,
+                    local_port)))
       return True
     return False
 
@@ -201,18 +196,24 @@ def ignore_ip(ip):
 # Return short version (mlabN.xyzNN) of hostname, if an M-Lab host.
 # Otherwise return just hostname.
 def get_mlab_hostname():
-   hostname = platform.node()
-   mlab_match = re.match('^(mlab\d+\.[a-z]{3}\d+)', hostname) 
-   if mlab_match:
-     return mlab_match.group(1)
-   return hostname
-
+  hostname = platform.node()
+  mlab_match = re.match(r'^(mlab\d+\.[a-z]{3}\d+)', hostname)
+  if mlab_match:
+    return mlab_match.group(1)
+  return hostname
 
 # A struct to hold all the data about a connection
 Connection = collections.namedtuple('Connection', ['remote_ip', 'remote_port',
                                                    'local_ip', 'local_port'])
 
+
 def parse_ss_line(line, connections):
+  """Parses a single line of ss output, and adds the connection to connections.
+
+  Args:
+      line: the line to parse
+      connections: the dictionary mapping connections to states
+  """
   # Parse a single line of the output of ss and put the result in connections.
   # Line looks like:
   #  ESTAB 0 0 127.0.0.1:9557 127.0.0.1:40171
@@ -237,7 +238,8 @@ def parse_ss_line(line, connections):
 
 
 def measure_connections():
-  command = 'ss --tcp --numeric'
+  """Runs the ss command, parses its output, and returns the result."""
+  command = SS_BIN + ' --tcp --numeric'
   status, connection_text = commands.getstatusoutput(command)
   if status != 0:
     log_worker('%s failed (return code %d)' % (command, status))
@@ -252,7 +254,15 @@ def measure_connections():
   return connections
 
 
-def is_IPv4(s):
+def is_ipv4(s):
+  """Tests whether a string represents an IPv4 address.
+
+  Args:
+      s: the string under test
+
+  Returns:
+      True if the string is an IPv4 address
+  """
   fields = s.split('.')
   if len(fields) != 4:
     return False
@@ -263,16 +273,18 @@ def is_IPv4(s):
 
 
 class ConnectionWatcher(object):
+  """Keeps track of all connections, in order to find recently-closed ones."""
+
   def __init__(self):
     self._connections = measure_connections()
 
-  def get_closed_connections(self):
-    # Find the connections that have been closed since the last query or are
-    # still marked as closed
+  def _get_closed_connections(self):
+    """Find the connections that are either marked as closed or disappeared."""
     old_connections = self._connections
     self._connections = measure_connections()
     closed = []
-    # a connection is closed if its status is SS_CLOSED or it isn't present
+    # a connection is closed if its status is SS_CLOSED or it isn't present but
+    # it previously was
     for conn in old_connections:
       if conn not in self._connections:
         closed.append(conn)
@@ -286,9 +298,8 @@ class ConnectionWatcher(object):
     # Filter out IPv6 addresses (TODO: support IPv6)
     # Filter out cached addresses and update the cache
     filtered = []
-    for conn in self.get_closed_connections():
-      if (is_IPv4(conn.remote_ip) and
-          is_IPv4(conn.local_ip) and
+    for conn in self._get_closed_connections():
+      if (is_ipv4(conn.remote_ip) and is_ipv4(conn.local_ip) and
           not ignore_ip(conn.remote_ip) and
           not recent_ip_cache.cached(conn.remote_ip)):
         recent_ip_cache.add(conn.remote_ip)
@@ -296,18 +307,23 @@ class ConnectionWatcher(object):
     return filtered
 
 
-if __name__ == '__main__':
-    (options, args) = optparser.parse_args()
-    mlab_hostname = get_mlab_hostname()
-    recent_ip_cache = RecentIPAddressCache(IP_CACHE_TIME_SECONDS)
-    pool = ParisTraceroutePool(options.logpath)
-    agent = ConnectionWatcher()
+def main():
+  (options, _) = optparser.parse_args()
+  mlab_hostname = get_mlab_hostname()
+  recent_ip_cache = RecentIPAddressCache(IP_CACHE_TIME_SECONDS)
+  pool = ParisTraceroutePool(options.logpath)
+  agent = ConnectionWatcher()
 
-    while True:
-      log_time = time.time()
-      connections = agent.uncached_closed_connections(recent_ip_cache)
-      for remote_ip, remote_port, local_ip, local_port in connections:
-          traceroute_port = PARIS_TRACEROUTE_SOURCE_PORT_BASE + pool.busy_workers_count()
-          pool.run_async(log_time, mlab_hostname, traceroute_port,
-                         remote_ip, remote_port, local_ip, local_port)
-      time.sleep(5)
+  while True:
+    log_time = time.time()
+    connections = agent.uncached_closed_connections(recent_ip_cache)
+    for remote_ip, remote_port, local_ip, local_port in connections:
+      traceroute_port = (
+          PARIS_TRACEROUTE_SOURCE_PORT_BASE + pool.busy_workers_count())
+      pool.run_async(log_time, mlab_hostname, traceroute_port, remote_ip,
+                     remote_port, local_ip, local_port)
+    time.sleep(5)
+
+
+if __name__ == '__main__':
+  main()

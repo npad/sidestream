@@ -15,6 +15,7 @@ import time
 import unittest
 import paris_rollins as paris_rollins
 
+
 class ParisRollinsTestCase(unittest.TestCase):
   # We would prefer to use a local IP, but paris traceroute doesn't
   # let us choose which interface the test runs on - and doesn't
@@ -39,8 +40,8 @@ class ParisRollinsTestCase(unittest.TestCase):
     for log_time in range(5):
       workers = 0
       traceroute_port = base_local_port + workers
-      while pool.run_async(log_time, test_hostname, traceroute_port,
-                           remote_ip, remote_port, local_ip, local_port):
+      while pool.run_async(log_time, test_hostname, traceroute_port, remote_ip,
+                           remote_port, local_ip, local_port):
         workers += 1
       # should be able to launch parallel traceroutes
       self.assertTrue(workers > 2)
@@ -49,17 +50,17 @@ class ParisRollinsTestCase(unittest.TestCase):
         time.sleep(1)
       # ensure all log files exist and have expected contents.
       for worker in range(workers):
-        expected_log = os.path.join(
-          self.tmpdir,
-          paris_rollins.make_log_file_name(self.tmpdir, log_time,
-                                           test_hostname,
-                                           remote_ip, remote_port,
-                                           local_ip, local_port))
+        expected_log = os.path.join(self.tmpdir,
+                                    paris_rollins.make_log_file_name(
+                                        self.tmpdir, log_time, test_hostname,
+                                        remote_ip, remote_port, local_ip,
+                                        local_port))
         self.assertTrue(os.path.isfile(expected_log))
         self.assertTrue(os.path.getsize(expected_log) > 0)
         expected_log_header = re.compile(
-          'traceroute \[\(%s:%u\) -> \(%s:%u\)\], protocol icmp, algo exhaustive' % (
-              '([\d\.]+)', traceroute_port, remote_ip, remote_port))
+            'traceroute \[\(%s:%u\) -> \(%s:%u\)\], protocol icmp, algo '
+            'exhaustive'
+            % ('([\d\.]+)', traceroute_port, remote_ip, remote_port))
         log_contents = open(expected_log).read()
         self.assertTrue(expected_log_header.match(log_contents) is not None)
 
@@ -75,25 +76,32 @@ class ParisRollinsTestCase(unittest.TestCase):
 
   def test_parse_ss_output(self):
     connections = {}
-    paris_rollins.parse_ss_line('ESTAB 0 0 127.0.0.1:9557 128.0.0.1:40171', connections)
+    paris_rollins.parse_ss_line('ESTAB 0 0 127.0.0.1:9557 128.0.0.1:40171',
+                                connections)
     self.assertEqual(len(connections), 1)
-    connection = paris_rollins.Connection(local_ip='127.0.0.1', local_port='9557', remote_ip='128.0.0.1', remote_port='40171')
+    connection = paris_rollins.Connection(
+        local_ip='127.0.0.1',
+        local_port='9557',
+        remote_ip='128.0.0.1',
+        remote_port='40171')
     self.assertTrue(connection in connections)
     self.assertEqual(connections[connection], 'ESTAB')
 
-  def test_isIPv4(self):
-    self.assertTrue(paris_rollins.is_IPv4('127.0.0.1'))
-    self.assertFalse(paris_rollins.is_IPv4('2620:0:1003:413:ad1b:7f2:9992:63b2'))
+  def test_isipv4(self):
+    self.assertTrue(paris_rollins.is_ipv4('127.0.0.1'))
+    self.assertFalse(
+        paris_rollins.is_ipv4('2620:0:1003:413:ad1b:7f2:9992:63b2'))
 
 
 class SocketPollingTestCase(unittest.TestCase):
+
   def setUp(self):
     self.assertTrue(paris_rollins.ignore_ip('127.0.0.1'))
     self._cached_ignored_nets = paris_rollins.IGNORE_IPV4_NETS
     paris_rollins.IGNORE_IPV4_NETS = ()
     self.assertFalse(paris_rollins.ignore_ip('127.0.0.1'))
     handler = SimpleHTTPServer.SimpleHTTPRequestHandler
-    self._server = SocketServer.TCPServer(("", 6666), handler)
+    self._server = SocketServer.TCPServer(('', 6666), handler)
     thread.start_new_thread(self._server.serve_forever, ())
 
   def tearDown(self):
@@ -135,5 +143,4 @@ class SocketPollingTestCase(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
-
+  unittest.main()
