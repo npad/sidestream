@@ -38,7 +38,7 @@ TIMEOUT_BIN = '/usr/bin/timeout'
 WORKER_NICE = 19
 # paris-traceroute should take no longer than this to complete (timed out,
 # partial results will be discarded).
-WORKER_TIMEOUT = 60 
+WORKER_TIMEOUT = 60
 # Maximum number of paris-traceoutes to run simultaneously (requests to run
 # more will be discarded).
 MAX_WORKERS = 10
@@ -179,7 +179,7 @@ class ParisTraceroutePool(object):
 
   # Return true if no workers running.
   def idle(self):
-    return self.busy_workers_count() == 0 
+    return self.busy_workers_count() == 0
 
   # Return true if we have spare capacity and we scheduled a traceroute.
   def run_async(self, log_time, mlab_hostname, traceroute_port,
@@ -202,7 +202,7 @@ def ignore_ip(ip):
 
 # return list of recently closed connections, not already seen.
 def uncached_closed_connections(agent, recent_ip_cache):
-   closed_connections = [] 
+   closed_connections = []
    for connection in agent.all_connections():
      try:
        state = connection.read('State')
@@ -229,12 +229,12 @@ def uncached_closed_connections(agent, recent_ip_cache):
 # Otherwise return just hostname.
 def get_mlab_hostname():
    hostname = platform.node()
-   mlab_match = re.match('^(mlab\d+\.[a-z]{3}\d+)', hostname) 
+   mlab_match = re.match('^(mlab\d+\.[a-z]{3}\d+)', hostname)
    if mlab_match:
      return mlab_match.group(1)
    return hostname
 
-           
+
 if __name__ == '__main__':
     (options, args) = optparser.parse_args()
     mlab_hostname = get_mlab_hostname()

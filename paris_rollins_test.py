@@ -19,7 +19,7 @@ class ParisRollinsTestCase(unittest.TestCase):
 
   def setUp(self):
     self.tmpdir = tempfile.mkdtemp()
-  
+
   def tearDown(self):
     shutil.rmtree(self.tmpdir)
 
@@ -60,7 +60,7 @@ class ParisRollinsTestCase(unittest.TestCase):
         self.assertTrue(expected_log_header.match(log_contents) is not None)
 
   def test_recentcache(self):
-    ip = self.TEST_DEST_IP 
+    ip = self.TEST_DEST_IP
     cache_timeout = 2
     cache = paris_rollins.RecentIPAddressCache(cache_timeout)
     for cache_refreshes in range(3):
