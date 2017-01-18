@@ -21,7 +21,19 @@ class ExitstatsTest(unittest.TestCase):
     self.assertEqual(exitstats.active_vars[0], 'MinRTT')
     self.assertTrue('MinA' in  exitstats.active_vars)
 
-  def testGetlogf(self):
+  def testGetName(self):
+    '''Check that getlogf successfully create the expected file'''
+    gm = time.gmtime(3600*814234)
+    logdir, logname = exitstats.logName('server', gm, None)
+    self.assertEquals(logdir, '2062/11/20/')
+    self.assertEquals(logname, 'server20621120T10:00:00Z_ALL0.web100')
+
+    gm = time.gmtime(3600*814234)
+    logdir, logname = exitstats.logName('server', gm, '5.4.3.2')
+    self.assertEquals(logdir, '2062/11/20/')
+    self.assertEquals(logname, 'server20621120T10:00:00Z_ALL0-5.4.3.2.web100')
+
+  def testGetLogFileOldBehavior(self):
     '''Check that getlogf successfully create the expected file'''
     # Need to set up the variables key to avoid error.
     exitstats.setkey({'foo':3, 'bar':2, 'baz':1})
@@ -36,7 +48,7 @@ class ExitstatsTest(unittest.TestCase):
       pass
 
     exitstats.server = server = 'server'
-    _ = exitstats.getlogf(3600*814234)
+    _ = exitstats.getLogFile(3600*814234)
 
     try:
       os.stat(logdir + logname)
@@ -50,6 +62,37 @@ class ExitstatsTest(unittest.TestCase):
       os.removedirs(logdir)
     except OSError:
       pass
+
+  def testGetLogFileWithLocalIP(self):
+    '''Check that getlogf successfully create the expected file'''
+    # Need to set up the variables key to avoid error.
+    exitstats.setkey({'foo':3, 'bar':2, 'baz':1})
+
+    logdir = '2062/11/20/'
+    logname = 'server20621120T10:00:00Z_ALL0-5.4.3.2.web100'
+    gm = time.gmtime(3600*814234)
+    try:
+      os.remove(logdir + logname)
+      os.removedirs(logdir)
+    except OSError:
+      pass
+
+    exitstats.server = server = 'server'
+    _ = exitstats.getLogFile(3600*814234, '5.4.3.2')
+
+    try:
+      os.stat(logdir + logname)
+    except OSError as e:
+      print('Expected file not created: ' + logdir + logname)
+      print(e)
+
+    # Clean up
+    try:
+      os.remove(logdir + logname)
+      os.removedirs(logdir)
+    except OSError:
+      pass
+
 
 if __name__ == '__main__':
   unittest.main()

@@ -107,7 +107,18 @@ def closeLogs():
     if v.f: v.f.close()
   logs.clear()
 
-def getLogFile(t, local_ip='all'):
+def logName(server, gm, local_ip):
+  ''' Form log directory name, and log name
+  '''
+  logdir= time.strftime("%Y/%m/%d/", gm)
+  ts = time.strftime("%Y%m%dT%TZ", gm)
+  if local_ip == None:
+    return logdir, "%s%s_ALL%d.web100"%(server, ts ,0)
+  else:
+    return logdir, "%s%s_ALL%d-%s.web100"%(server, ts ,0, local_ip)
+
+
+def getLogFile(t, local_ip=None):
   global one_hour, logs, log_time, server
   hour_time = int(t / one_hour) * one_hour
 
@@ -120,15 +131,17 @@ def getLogFile(t, local_ip='all'):
     return logs[local_ip].f
   else:
     gm = time.gmtime(hour_time)
-    logdir= time.strftime("%Y/%m/%d/", gm)
     mkdirs(logdir)
     ts = time.strftime("%Y%m%dT%TZ", gm)
     logname=logdir+"%s%s_ALL%d-%s-web100"%(server, ts ,0, local_ip)
     print "Opening:", logname
-    logf = open(logname, "a")
+    logdir, logname = logName(server, gm, local_ip)
+    mkdirs(logdir)
+    print "Opening:", logdir+logname
+    logf = open(logdir+logname, "a")
     logHeader(logf)
     # Add the entry to the logs dict.
-    logs[local_ip] = LogInfo(logname, f=logf)
+    logs[local_ip] = LogInfo(logdir+logname, f=logf)
     return logf
 
 def logConnection(c):
