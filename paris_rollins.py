@@ -28,10 +28,18 @@ import sys
 import time
 
 import platform
-import Web100
+try:
+    import Web100
+except ImportError:
+    print "Error importing web100"
 
 # What binary to use for paris-traceroute
 PARIS_TRACEROUTE_BIN = '/usr/local/bin/paris-traceroute'
+try:
+  os.stat(PARIS_TRACEROUTE_BIN)
+except OSError as e:
+  PARIS_TRACEROUTE_BIN = '/usr/sbin/paris-traceroute'
+
 # What binary to use for timeout (see comment about python/dependencies, above)
 TIMEOUT_BIN = '/usr/bin/timeout'
 # paris-traceroute is run at this nice level, to minimize impact on the host.
