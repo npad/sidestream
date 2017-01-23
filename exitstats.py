@@ -148,19 +148,19 @@ def main(argv=None):
 
   if argv is None:
     argv = sys.argv
-  if len(sys.argv) == 1:
-      server=""
-  elif len(sys.argv) == 2:
-    server=sys.argv[1]+"/"
+  if len(argv) == 1:
+      server = ""
+  elif len(argv) == 2:
+    server = argv[1]+"/"
   else:
     print "Usage: %s [server_name]"%sys.argv[0]
     sys.exit()
 
   a = Web100Agent()
-  closed=[]
+  closed = []
   while True:
     cl = a.all_connections()
-    newclosed=[]
+    newclosed = []
     for c in cl:
       try:
         if c.read('State') == 1:
