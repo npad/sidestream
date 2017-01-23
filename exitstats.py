@@ -107,18 +107,37 @@ def closeLogs():
     if v.f: v.f.close()
   logs.clear()
 
+def useLocalIP():
+  ''' Interpret local environment variable to determine whether to use
+      local IP address.
+  '''
+  env_var = os.environ.get('SIDESTREAM_USE_LOCAL_IP')
+  return env_var == 'True' or env_var == 'true' or env_var == '1'
+
 def logName(server, gm, local_ip):
-  ''' Form log directory name, and log name
+  ''' Form directory name and file name for log file.
   '''
   logdir= time.strftime("%Y/%m/%d/", gm)
   ts = time.strftime("%Y%m%dT%TZ", gm)
-  if local_ip == None:
-    return logdir, "%s%s_ALL%d.web100"%(server, ts ,0)
-  else:
+  if local_ip != None:
     return logdir, "%s%s_ALL%d-%s.web100"%(server, ts ,0, local_ip)
+  else:
+    return logdir, "%s%s_ALL%d.web100"%(server, ts ,0)
 
+def openLogFile(logdir, logname):
+    mkdirs(logdir)
+    print "Opening:", logdir+logname
+    logf = open(logdir+logname, "a")
+    logHeader(logf)
+    # Add the entry to the logs dict.
+    return logf
 
 def getLogFile(t, local_ip=None):
+  ''' getLogFile returns the appropriate logFile for the current time
+      and local_ip address.
+      If os.environment["SIDESTREAM_USE_LOCAL_IP"] is true, then it
+      uses separate files for each local IP address.
+  '''
   global one_hour, logs, log_time, server
   hour_time = int(t / one_hour) * one_hour
 
@@ -127,21 +146,15 @@ def getLogFile(t, local_ip=None):
     closeLogs()
     log_time = hour_time
 
+  use_local = useLocalIP()  # Is this a speed concern?
+  local_ip = local_ip if useLocalIP() else None
   if local_ip in logs:
     return logs[local_ip].f
   else:
     gm = time.gmtime(hour_time)
-    mkdirs(logdir)
-    ts = time.strftime("%Y%m%dT%TZ", gm)
-    logname=logdir+"%s%s_ALL%d-%s-web100"%(server, ts ,0, local_ip)
-    print "Opening:", logname
     logdir, logname = logName(server, gm, local_ip)
-    mkdirs(logdir)
-    print "Opening:", logdir+logname
-    logf = open(logdir+logname, "a")
-    logHeader(logf)
-    # Add the entry to the logs dict.
-    logs[local_ip] = LogInfo(logdir+logname, f=logf)
+    logf = openLogFile(logdir, logname)
+    logs[local_ip] = LogInfo(logdir+logname, logf)
     return logf
 
 def logConnection(c):
