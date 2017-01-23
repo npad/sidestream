@@ -5,16 +5,15 @@ exitstats.py: Poll for newly closed connections and print their Web100
 stats.
 """
 
-print "Starting exitstats"
-
 import time
 import sys
 import os
+from collections import namedtuple
 
 try:
   from Web100 import *
 except ImportError:
-  print "Error importing web100"
+  print 'Error importing web100'
 
 stdvars=[
 "LocalAddress", "LocalPort", "RemAddress", "RemPort", "State", "SACKEnabled",
@@ -51,8 +50,12 @@ def setkey(snap):
   stdvars above, however since the actual variables present in the kernel
   can be altered by build parameters etc, we audit the std list against
   the actual kernel list.
-  
-  Thus the keys will usually be same from data set to data set, but this
+
+  Keys in stdvars will be logged in consistent order.  Any new keys will
+  be logged in the order they appear in the snapshot, after all the standard
+  keys.
+
+  The keys will usually be same from data set to data set, but this
   is not guaranteed.
   """
   global active_vars, stdvars
@@ -68,7 +71,7 @@ def setkey(snap):
 #   print "Non-std variable found:", k
     active_vars.append(k)
 
-def showkey(f):
+def logHeader(f):
   global active_vars
   f.write("K: cid PollTime")
   for k in active_vars:
@@ -89,38 +92,72 @@ def mkdirs(name):
       if e[0] != 17:   # ignore "exists"
         raise e
 
-def postproc(dir):
-    """
-    Remove all write permissions, compute md5sums, etc
-    """
-    for f in glob.glob(dir+"*"):
-        os.chmod(f, 0444)
-    subprocess.call("find . -type f | xargs md5sum > ../manifest.tmp", shell=True, chdir=dir)
-    os.rename(dir+"/../manifest.tmp", dir+"/manifest.md5")
-    os.chmod(dir+"/manifest.md5", 0555)
-    os.chmod(dir, 0555)    # And make it immutable 
+server = ""
+one_hour = (60*60)
+LogInfo = namedtuple('LogInfo', ['name', 'f'])
 
-logtime=(60*60)
-logf=None
-olt = -1
-olddir=""
-def getlogf(t):
-  global olt, logtime, logf, server
-  lt = int(t / logtime)*logtime
-  if lt != olt:
-    olt=lt
-    if logf: logf.close()
-    logdir=time.strftime("%Y/%m/%d/", time.gmtime(lt))
-    if olddir and olddir!=logdir:
-      postproc(olddir)
+# Map from IP address to LogInfo
+# May include key=None if we are not using per IP logs.
+logs = {}
+log_time = -1
+def closeLogs():
+  ''' Close all log files, e.g. at the top of each hour.
+  '''
+  for k, v in logs:
+    if v.f: v.f.close()
+  logs.clear()
+
+def useLocalIP():
+  ''' Interpret local environment variable to determine whether to use
+      local IP address.
+  '''
+  env_var = os.environ.get('SIDESTREAM_USE_LOCAL_IP')
+  return env_var == 'True' or env_var == 'true' or env_var == '1'
+
+def logName(server, gm, local_ip):
+  ''' Form directory name and file name for log file.
+  '''
+  logdir= time.strftime("%Y/%m/%d/", gm)
+  ts = time.strftime("%Y%m%dT%TZ", gm)
+  if local_ip != None:
+    return logdir, "%s%s_ALL%d-%s.web100"%(server, ts ,0, local_ip)
+  else:
+    return logdir, "%s%s_ALL%d.web100"%(server, ts ,0)
+
+def openLogFile(logdir, logname):
     mkdirs(logdir)
-    logname=time.strftime("%Y/%m/%d/%%s%Y%m%dT%TZ_ALL%%d.web100", time.gmtime(lt))%(server, 0)
-    print "Opening:", logname
-    logf=open(logname, "a")
-    showkey(logf)
-  return logf
+    print "Opening:", logdir+logname
+    logf = open(logdir+logname, "a")
+    logHeader(logf)
+    # Add the entry to the logs dict.
+    return logf
 
-def showconn(c):
+def getLogFile(t, local_ip=None):
+  ''' getLogFile returns the appropriate logFile for the current time
+      and local_ip address.
+      If os.environment["SIDESTREAM_USE_LOCAL_IP"] is true, then it
+      uses separate files for each local IP address.
+  '''
+  global one_hour, logs, log_time, server
+  hour_time = int(t / one_hour) * one_hour
+
+  # Every hour, we close all the log files and start new ones.
+  if hour_time > log_time:
+    closeLogs()
+    log_time = hour_time
+
+  use_local = useLocalIP()  # Is this a speed concern?
+  local_ip = local_ip if useLocalIP() else None
+  if local_ip in logs:
+    return logs[local_ip].f
+  else:
+    gm = time.gmtime(hour_time)
+    logdir, logname = logName(server, gm, local_ip)
+    logf = openLogFile(logdir, logname)
+    logs[local_ip] = LogInfo(logdir+logname, logf)
+    return logf
+
+def logConnection(c):
   global active_vars
   snap = c.readall()
   if not active_vars:
@@ -133,13 +170,12 @@ def showconn(c):
 
   # pick/open a logfile as needed, based on the close poll time
   t = time.time()
-  logf=getlogf(t, snap)
+  logf = getLogFile(t, snap["LocalAddress"])
   logf.write("C: %d %s"%(c.cid, time.strftime("%Y-%m-%d-%H:%M:%SZ", time.gmtime(t))))
   for v in active_vars:
     logf.write(" "+str(snap[v]))
   logf.write("\n")
   logf.flush()
-
 
 # Main
 
@@ -151,24 +187,24 @@ def main(argv):
   elif len(argv) == 2:
     server = argv[1]+"/"
   else:
-    print "Usage: %s [server_name]"%sys.argv[0]
-    sys.exit()
+    print "Usage: %s [server_name]"%argv[0]
+    return 0
 
-  a = Web100Agent()
+  agent = Web100Agent()
   closed = []
   while True:
-    cl = a.all_connections()
+    conns = agent.all_connections()
     newclosed = []
-    for c in cl:
+    for c in conns:
       try:
         if c.read('State') == 1:
           newclosed.append(c.cid)
           if not c.cid in closed:
-            showconn(c)
+            logConnection(c)
       except Exception, e:
 #       print "Exception:", e
         pass
-    closed=newclosed;
+    closed = newclosed;
     time.sleep(5)
 
 if __name__ == "__main__":
