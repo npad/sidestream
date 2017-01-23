@@ -143,13 +143,11 @@ def showconn(c):
 
 # Main
 
-def main(argv=None):
+def main(argv):
   print "Starting exitstats"
 
-  if argv is None:
-    argv = sys.argv
   if len(argv) == 1:
-      server = ""
+    server = ""
   elif len(argv) == 2:
     server = argv[1]+"/"
   else:
@@ -174,4 +172,4 @@ def main(argv=None):
     time.sleep(5)
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv))
