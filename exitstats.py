@@ -7,10 +7,14 @@ stats.
 
 print "Starting exitstats"
 
-from Web100 import *
 import time
 import sys
 import os
+
+try:
+  from Web100 import *
+except ImportError:
+  print "Error importing web100"
 
 stdvars=[
 "LocalAddress", "LocalPort", "RemAddress", "RemPort", "State", "SACKEnabled",
@@ -40,7 +44,7 @@ stdvars=[
 "WAD_CwndAdjust"
 ]
 
-vars=None
+active_vars=None
 def setkey(snap):
   """
   Select the variables to be saved.   By default this is the same as
@@ -51,23 +55,23 @@ def setkey(snap):
   Thus the keys will usually be same from data set to data set, but this
   is not guaranteed.
   """
-  global vars, stdvars
-  vars=[]
+  global active_vars, stdvars
+  active_vars=[]
   s=snap.copy()
   for k in stdvars:
     if k in s:
-      vars.append(k)
+      active_vars.append(k)
       del s[k]
 #   else:
 #     print "Standard variable %s omited"%k
   for k in s:
 #   print "Non-std variable found:", k
-    vars.append(k)
+    active_vars.append(k)
 
-def showkey(f, snap):
-  global vars
+def showkey(f):
+  global active_vars
   f.write("K: cid PollTime")
-  for k in vars:
+  for k in active_vars:
     f.write(" "+k)
   f.write("\n")
 
@@ -100,7 +104,7 @@ logtime=(60*60)
 logf=None
 olt = -1
 olddir=""
-def getlogf(t, snap):
+def getlogf(t):
   global olt, logtime, logf, server
   lt = int(t / logtime)*logtime
   if lt != olt:
@@ -113,13 +117,13 @@ def getlogf(t, snap):
     logname=time.strftime("%Y/%m/%d/%%s%Y%m%dT%TZ_ALL%%d.web100", time.gmtime(lt))%(server, 0)
     print "Opening:", logname
     logf=open(logname, "a")
-    showkey(logf, snap)
+    showkey(logf)
   return logf
 
 def showconn(c):
-  global vars
+  global active_vars
   snap = c.readall()
-  if not vars:
+  if not active_vars:
     setkey(snap)
   # Ignore connections to loopback and Planet Lab Control (PLC)
   if snap["RemAddress"] == "127.0.0.1":
@@ -131,7 +135,7 @@ def showconn(c):
   t = time.time()
   logf=getlogf(t, snap)
   logf.write("C: %d %s"%(c.cid, time.strftime("%Y-%m-%d-%H:%M:%SZ", time.gmtime(t))))
-  for v in vars:
+  for v in active_vars:
     logf.write(" "+str(snap[v]))
   logf.write("\n")
   logf.flush()
@@ -139,29 +143,33 @@ def showconn(c):
 
 # Main
 
-if len(sys.argv) == 1:
-  server=""
-elif len(sys.argv) == 2:
-  server=sys.argv[1]+"/"
-else:
-  print "Usage: %s [server_name]"%sys.argv[0]
-  sys.exit()
+def main(argv):
+  print "Starting exitstats"
 
-a = Web100Agent()
-closed=[]
-while True:
-  cl = a.all_connections()
-  newclosed=[]
-  for c in cl:
-    try:
-      if c.read('State') == 1:
-        newclosed.append(c.cid)
-        if not c.cid in closed:
-          showconn(c)
-    except Exception, e:
-#     print "Exception:", e
-      pass
-  closed=newclosed;
-  time.sleep(5)
+  if len(argv) == 1:
+    server = ""
+  elif len(argv) == 2:
+    server = argv[1]+"/"
+  else:
+    print "Usage: %s [server_name]"%sys.argv[0]
+    sys.exit()
 
+  a = Web100Agent()
+  closed = []
+  while True:
+    cl = a.all_connections()
+    newclosed = []
+    for c in cl:
+      try:
+        if c.read('State') == 1:
+          newclosed.append(c.cid)
+          if not c.cid in closed:
+            showconn(c)
+      except Exception, e:
+#       print "Exception:", e
+        pass
+    closed=newclosed;
+    time.sleep(5)
 
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
