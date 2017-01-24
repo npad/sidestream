@@ -8,12 +8,12 @@ before_install:
   - sudo apt-get install -y paris-traceroute
 
 install:
-  - pip install -r requirements.txt
-  - pip install -r test-requirements.txt
-  - sudo pip install coverage  # Because we have to call if from sudo
+  # Install dependencies with sudo, so that they can be used from sudo
+  - sudo pip install -r requirements.txt
+  - sudo pip install -r test-requirements.txt
 
 script:
-  - sudo python -m coverage run --source='.' --omit '*_test.py' -m unittest discover --pattern='*_test.py'
+  - sudo coverage run --source='.' --omit '*_test.py' -m unittest discover --pattern='*_test.py'
 
 after_success:
   coveralls

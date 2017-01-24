@@ -9,10 +9,65 @@ import os
 import unittest
 import time
 from test.test_support import EnvironmentVarGuard
+import prometheus_client as prom
+import urllib2
 
 import exitstats
+class FakeConnection():
+  '''Substitute for Web100 connection object for testing.'''
+  cid = 0
+  values = {}
 
-class ExitstatsTest(unittest.TestCase):
+  def readall(self):
+    '''Returns dictionary of metrics'''
+    return self.values
+
+  def setall(self, v):
+    self.values = v
+
+  def copy(self):
+    result = FakeConnection()
+    result.cid = self.cid
+    result.values = self.values
+    return result
+
+  def __iter__(self):
+    return values.__iter__()
+
+class TestMonitoring(unittest.TestCase):
+  def setUp(self):
+    prom.start_http_server(exitstats.PROMETHEUS_SERVER_PORT)
+    print('started server on port %s'%(exitstats.PROMETHEUS_SERVER_PORT))
+
+  def tearDown(self):
+    # Ideally should shut down the server daemon.
+    pass
+
+  def testConnectionCount(self):
+    c1 = FakeConnection()
+    c1.cid = 1234
+    c1.setall({"RemAddress": "5.4.3.2", "LocalAddress": "1.2.3.4", "other": "other"})
+    exitstats.setkey(c1.values)
+    exitstats.logConnection(c1)
+
+    # Read from the httpserver and assert the correct connection count.
+    url = "http://localhost:%s"%(exitstats.PROMETHEUS_SERVER_PORT)
+    # Read in a while loop, since the server is a daemon and may not start immediately.
+    for _ in range(1000):
+      try:
+        response = urllib2.urlopen(url).read()
+        print("ok")
+        break;
+      except urllib2.URLError as e:
+        print('-', end="")
+        time.sleep(0.01)
+    else:
+      raise urllib2.URLError('Page not found')
+
+    self.assertTrue(
+        "sidestream_connection_count{source=\"ipv4\"} 1.0" in response, response)
+
+class TestExitstats(unittest.TestCase):
   def remove_file(self, logdir, logname):
     ''' Utility to remove a file and its directory'''
     try:
