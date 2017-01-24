@@ -46,12 +46,9 @@ stdvars=[
 ]
 
 PROMETHEUS_SERVER_PORT = 9090
-connection_count = prom.Counter('connection_count',
-                                'Count of connections logged')
-plc_connection_count = prom.Counter('plc_connection_count',
-                                    'Count of connections to Planet Lab')
-main_loop_count = prom.Counter('main_loop_count',
-                               'Count of main loop iterations')
+connection_count = prom.Counter('sidestream_connection_count',
+                                'Count of connections logged',
+                                ['source'])
 
 active_vars=None
 def setkey(snap):
@@ -172,15 +169,19 @@ def logConnection(c):
   snap = c.readall()
   if not active_vars:
     setkey(snap)
-  # Ignore connections to loopback and Planet Lab Control (PLC)
-  if snap["RemAddress"] == "127.0.0.1":
+  # Count connections to loopback and Planet Lab Control (PLC),
+  # but don't log them.
+  remote = snap["RemAddress"]
+  if remote == "127.0.0.1":
+    connection_count.labels('loopback').inc()
     return
-  if snap["RemAddress"].startswith("128.112.139"):
-    plc_connection_count.inc()
+  elif remote.startswith("128.112.139"):
+    connection_count.labels('plc').inc()
     return
-
-  # Count only the remote connections.
-  connection_count.inc()
+  elif ':' in remote:
+    connection_count.labels('ipv6').inc()
+  else:
+    connection_count.labels('ipv4').inc()
 
   # pick/open a logfile as needed, based on the close poll time
   t = time.time()
@@ -210,7 +211,6 @@ def main(argv):
   agent = Web100Agent()
   closed = []
   while True:
-    main_loop_count.inc()
     conns = agent.all_connections()
     newclosed = []
     for c in conns:
@@ -223,6 +223,7 @@ def main(argv):
 #       print "Exception:", e
         pass
     closed = newclosed;
+    # Wait 5 seconds before running polling again.
     time.sleep(5)
 
 if __name__ == "__main__":

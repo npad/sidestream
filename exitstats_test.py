@@ -39,6 +39,10 @@ class TestMonitoring(unittest.TestCase):
     prom.start_http_server(exitstats.PROMETHEUS_SERVER_PORT)
     print('started server on port %s'%(exitstats.PROMETHEUS_SERVER_PORT))
 
+  def tearDown(self):
+    # Ideally should shut down the server daemon.
+    pass
+
   def testConnectionCount(self):
     c1 = FakeConnection()
     c1.cid = 1234
@@ -49,7 +53,7 @@ class TestMonitoring(unittest.TestCase):
     # Read from the httpserver and assert the correct connection count.
     url = "http://localhost:%s"%(exitstats.PROMETHEUS_SERVER_PORT)
     # Read in a while loop, since the server is a daemon and may not start immediately.
-    while True:
+    for _ in range(1000):
       try:
         response = urllib2.urlopen(url).read()
         print("ok")
@@ -57,9 +61,11 @@ class TestMonitoring(unittest.TestCase):
       except urllib2.URLError as e:
         print('-', end="")
         time.sleep(0.01)
-      
-    self.assertTrue("connection_count 1.0" in response)
-    
+    else:
+      raise urllib2.URLError('Page not found')
+
+    self.assertTrue(
+        "sidestream_connection_count{source=\"ipv4\"} 1.0" in response, response)
 
 class TestExitstats(unittest.TestCase):
   def remove_file(self, logdir, logname):

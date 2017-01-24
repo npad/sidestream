@@ -13,7 +13,7 @@ install:
   - sudo pip install -r test-requirements.txt
 
 script:
-  - sudo coverage run --source='.' --omit '*_test.py' -m unittest discover --pattern='*_test.py' && echo $?
+  - sudo coverage run --source='.' --omit '*_test.py' -m unittest discover --pattern='*_test.py'
 
 after_success:
   coveralls
