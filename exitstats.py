@@ -10,6 +10,8 @@ import sys
 import os
 from collections import namedtuple
 
+import prometheus_client as prom
+
 try:
   from Web100 import *
 except ImportError:
@@ -42,6 +44,14 @@ stdvars=[
 "X_RcvRTT", "WAD_IFQ", "WAD_MaxBurst", "WAD_MaxSsthresh", "WAD_NoAI",
 "WAD_CwndAdjust"
 ]
+
+PROMETHEUS_SERVER_PORT = 9090
+connection_count = prom.Counter('connection_count',
+                                'Count of connections logged')
+plc_connection_count = prom.Counter('plc_connection_count',
+                                    'Count of connections to Planet Lab')
+main_loop_count = prom.Counter('main_loop_count',
+                               'Count of main loop iterations')
 
 active_vars=None
 def setkey(snap):
@@ -166,7 +176,11 @@ def logConnection(c):
   if snap["RemAddress"] == "127.0.0.1":
     return
   if snap["RemAddress"].startswith("128.112.139"):
+    plc_connection_count.inc()
     return
+
+  # Count only the remote connections.
+  connection_count.inc()
 
   # pick/open a logfile as needed, based on the close poll time
   t = time.time()
@@ -190,9 +204,13 @@ def main(argv):
     print "Usage: %s [server_name]"%argv[0]
     return 0
 
+  # Start prometheus server to export metrics.
+  prom.start_http_server(PROMETHEUS_SERVER_PORT)
+
   agent = Web100Agent()
   closed = []
   while True:
+    main_loop_count.inc()
     conns = agent.all_connections()
     newclosed = []
     for c in conns:
