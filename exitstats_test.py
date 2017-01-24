@@ -37,6 +37,7 @@ class FakeConnection():
 class TestMonitoring(unittest.TestCase):
   def setUp(self):
     prom.start_http_server(exitstats.PROMETHEUS_SERVER_PORT)
+    print('started server on port %s'%(exitstats.PROMETHEUS_SERVER_PORT))
 
   def testConnectionCount(self):
     c1 = FakeConnection()
@@ -46,10 +47,19 @@ class TestMonitoring(unittest.TestCase):
     exitstats.logConnection(c1)
 
     # Read from the httpserver and assert the correct connection count.
-    print("http://localhost:%s"%(exitstats.PROMETHEUS_SERVER_PORT))
-    response = urllib2.urlopen(
-        "http://localhost:%s"%(exitstats.PROMETHEUS_SERVER_PORT)).read()
+    url = "http://localhost:%s"%(exitstats.PROMETHEUS_SERVER_PORT)
+    # Read in a while loop, since the server is a daemon and may not start immediately.
+    while True:
+      try:
+        response = urllib2.urlopen(url).read()
+        print("ok")
+        break;
+      except urllib2.URLError as e:
+        print('-', end="")
+        time.sleep(0.01)
+      
     self.assertTrue("connection_count 1.0" in response)
+    
 
 class TestExitstats(unittest.TestCase):
   def remove_file(self, logdir, logname):
