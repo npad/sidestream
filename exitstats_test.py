@@ -114,14 +114,14 @@ class TestExitstats(unittest.TestCase):
       self.assertFalse(exitstats.useLocalIP())
       logdir, logname = exitstats.logName('server', gm, '5.4.3.2')
       self.assertEquals(logdir, '2062/11/20/')
-      self.assertEquals(logname, 'server20621120T10:00:00Z_ALL0-5.4.3.2.web100')
+      self.assertEquals(logname, 'server20621120T10:00:00Z_5.4.3.2_0.web100')
 
     with EnvironmentVarGuard() as env:
       env.set('SIDESTREAM_USE_LOCAL_IP', 'True')
       self.assertTrue(exitstats.useLocalIP())
       logdir, logname = exitstats.logName('server', gm, '5.4.3.2')
       self.assertEquals(logdir, '2062/11/20/')
-      self.assertEquals(logname, 'server20621120T10:00:00Z_ALL0-5.4.3.2.web100')
+      self.assertEquals(logname, 'server20621120T10:00:00Z_5.4.3.2_0.web100')
 
   def testGetLogFileOldBehavior(self):
     '''Check that getlogf successfully create the expected file'''
@@ -142,7 +142,7 @@ class TestExitstats(unittest.TestCase):
 
     self.assertExists(logdir, logname)
 
-    logname_with_ip = 'server20621120T10:00:00Z_ALL0-5.4.3.2.web100'
+    logname_with_ip = 'server20621120T10:00:00Z_5.4.3.2_0.web100'
     self.remove_file(logdir, logname_with_ip)
     with EnvironmentVarGuard() as env:
       env.set('SIDESTREAM_USE_LOCAL_IP', 'False')
@@ -164,7 +164,7 @@ class TestExitstats(unittest.TestCase):
     exitstats.setkey({'foo':3, 'bar':2, 'baz':1})
 
     logdir = '2062/11/20/'
-    logname = 'server20621120T10:00:00Z_ALL0-5.4.3.2.web100'
+    logname = 'server20621120T10:00:00Z_5.4.3.2_0.web100'
     gm = time.gmtime(3600*814234)
     exitstats.server = server = 'server'
 

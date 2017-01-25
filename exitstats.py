@@ -127,7 +127,7 @@ def logName(server, gm, local_ip):
   logdir= time.strftime("%Y/%m/%d/", gm)
   ts = time.strftime("%Y%m%dT%TZ", gm)
   if local_ip != None:
-    return logdir, "%s%s_ALL%d-%s.web100"%(server, ts ,0, local_ip)
+    return logdir, "%s%s_%s_%d.web100"%(server, ts , local_ip, 0)
   else:
     return logdir, "%s%s_ALL%d.web100"%(server, ts ,0)
 

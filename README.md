@@ -37,11 +37,15 @@ http://npad.iupui.mlab4.nuq01.measurement-lab.org:8000/Sample/1048576.tx...
 
 2.1) Web100 stats
 
-Web100 exit statistics are saved by the daemons into ascii files named:
+Web100 exit statistics are saved by the daemons into ascii files named according to one of two conventions:
 `SideStream/yyyy/mm/dd/nodename/iso_timeZ_ALL0.web100`
+`SideStream/yyyy/mm/dd/nodename/iso_timeZ_12.34.56.78_0.web100` or
+`SideStream/yyyy/mm/dd/nodename/iso_timeZ_AB12:CD34:EF56:0078::::_0.web100`
   * `ALL` indicates that this is aggregate data across all clients.
+  * _12.34.56.78_ indicates all data from clients using the indicated local IPv4 or IPv6 address.
   * The `0` might be another small integer to guarantee that the names are unique, for example if the data collection is
     restarted.
+  
 Each file contains all the data collected in 1 hour.
 
 There are two types of records.
