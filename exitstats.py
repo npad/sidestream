@@ -125,9 +125,10 @@ class Web100StatsWriter:
         env_var = os.environ.get('SIDESTREAM_USE_LOCAL_IP')
         return env_var == 'True' or env_var == 'true' or env_var == '1'
 
-    def logName(self, gm, local_ip):
+    def logName(self, local_time, local_ip):
         ''' Form directory name and file name for log file.
         '''
+        gm = time.gmtime(local_time)
         logdir= time.strftime("%Y/%m/%d/", gm) + self.server
         ts = time.strftime("%Y%m%dT%TZ", gm)
         if local_ip != None:
@@ -162,8 +163,7 @@ class Web100StatsWriter:
         if local_ip in self.logs:
             return self.logs[local_ip].f
         else:
-            gm = time.gmtime(hour_time)
-            logdir, logname = self.logName(gm, local_ip)
+            logdir, logname = self.logName(hour_time, local_ip)
             logf = self.openLogFile(logdir, logname)
             self.logs[local_ip] = self.LogInfo(logdir+logname, logf)
             return logf

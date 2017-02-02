@@ -122,7 +122,7 @@ class TestExitstats(unittest.TestCase):
     '''Check that getlogf successfully create the expected file'''
     local_time = time.time()
     local_hour = int(local_time / one_hour) * one_hour
-    logdir, logname = stats_writer.logName(time.gmtime(local_hour), None)
+    logdir, logname = stats_writer.logName(local_hour, None)
     self.assertEquals(logdir, '2014/02/23/server/')
     self.assertEquals(logname, '20140223T10:00:00Z_ALL0.web100')
 
@@ -130,14 +130,14 @@ class TestExitstats(unittest.TestCase):
     with EnvironmentVarGuard() as env:
       env.set('SIDESTREAM_USE_LOCAL_IP', 'False')
       self.assertFalse(stats_writer.useLocalIP())
-      logdir, logname = stats_writer.logName(time.gmtime(local_hour), '5.4.3.2')
+      logdir, logname = stats_writer.logName(local_hour, '5.4.3.2')
       self.assertEquals(logdir, '2014/02/23/server/')
       self.assertEquals(logname, '20140223T10:00:00Z_5.4.3.2_0.web100')
 
     with EnvironmentVarGuard() as env:
       env.set('SIDESTREAM_USE_LOCAL_IP', 'True')
       self.assertTrue(stats_writer.useLocalIP())
-      logdir, logname = stats_writer.logName(time.gmtime(local_hour), '5.4.3.2')
+      logdir, logname = stats_writer.logName(local_hour, '5.4.3.2')
       self.assertEquals(logdir, '2014/02/23/server/')
       self.assertEquals(logname, '20140223T10:00:00Z_5.4.3.2_0.web100')
 
@@ -149,8 +149,6 @@ class TestExitstats(unittest.TestCase):
     # Need to set up the variables key to avoid error.
     stats_writer.setkey({'foo':3, 'bar':2, 'baz':1})
 
-    local_time = time.time()
-#    local_hour = int(local_time / one_hour) * one_hour
     logdir = '2014/02/23/server/'
     logname = '20140223T10:00:00Z_ALL0.web100'
     stats_writer.server = server = 'server/'
@@ -159,7 +157,7 @@ class TestExitstats(unittest.TestCase):
     with EnvironmentVarGuard() as env:
       env.set('SIDESTREAM_USE_LOCAL_IP', 'False')
       self.assertFalse(stats_writer.useLocalIP())
-      _ = stats_writer.getLogFile(local_time)
+      _ = stats_writer.getLogFile(time.time())
 
     self.assertExists(logdir, logname)
     self.remove_file(logdir, logname)
@@ -171,8 +169,7 @@ class TestExitstats(unittest.TestCase):
     stats_writer.closeLogs()
     # Need to set up the variables key to avoid error.
     stats_writer.setkey({'foo':3, 'bar':2, 'baz':1})
-    local_time = time.time()
-#    local_hour = int(local_time / one_hour) * one_hour
+
     logdir = '2014/02/23/server/'
     logname = '20140223T10:00:00Z_ALL0.web100'
     logname_with_ip = '20140223T10:00:00Z_5.4.3.2_0.web100'
@@ -184,7 +181,7 @@ class TestExitstats(unittest.TestCase):
       env.set('SIDESTREAM_USE_LOCAL_IP', 'False')
       self.assertFalse(stats_writer.useLocalIP())
       # Shouldn't matter if we specify the ip address.
-      _ = stats_writer.getLogFile(local_time, '5.4.3.2')
+      _ = stats_writer.getLogFile(time.time(), '5.4.3.2')
 
     # Check that IP named file does not exist.
     with self.assertRaises(OSError):
@@ -204,8 +201,6 @@ class TestExitstats(unittest.TestCase):
     # Need to set up the variables key to avoid error.
     stats_writer.setkey({'foo':3, 'bar':2, 'baz':1})
 
-    t = time.time()
-    local_hour = int(t / one_hour) * one_hour
     logdir = '2014/02/23/server/'
     logname = '20140223T10:00:00Z_5.4.3.2_0.web100'
     stats_writer.server = server = 'server/'
@@ -214,7 +209,7 @@ class TestExitstats(unittest.TestCase):
     with EnvironmentVarGuard() as env:
       env.set('SIDESTREAM_USE_LOCAL_IP', 'True')
       self.assertTrue(stats_writer.useLocalIP())
-      _ = stats_writer.getLogFile(t, '5.4.3.2')
+      _ = stats_writer.getLogFile(time.time(), '5.4.3.2')
 
     self.assertExists(logdir, logname)
 
