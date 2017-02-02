@@ -37,13 +37,16 @@ class FakeConnection():
   def __iter__(self):
     return values.__iter__()
 
+# Monitoring support should record counts of connections.
+# For now, we only test ipv4, and verify that the last 6 bits are included
+# in the count label.
 class TestMonitoring(unittest.TestCase):
   stats_writer = None
 
   def setUp(self):
     global stats_writer
     prom.start_http_server(exitstats.PROMETHEUS_SERVER_PORT)
-    stats_writer = exitstats.Web100StatsWriter('server')
+    stats_writer = exitstats.Web100StatsWriter('server/')
 
   def tearDown(self):
     # Ideally should shut down the server daemon.
@@ -53,10 +56,13 @@ class TestMonitoring(unittest.TestCase):
   def testConnectionCount(self):
     c1 = FakeConnection()
     c1.cid = 1234
-    c1.setall({"RemAddress": "5.4.3.2", "LocalAddress": "1.2.3.4",
+    # Use IP address LSB that tests masking of last 6 bits, and is distinct
+    # from bits in other tests, so we can verify the count.  121 % 64 = 33
+    c1.setall({"RemAddress": "5.4.3.2", "LocalAddress": "1.2.3.121",
                "LocalPort":432, "RemPort":234})
     stats_writer.setkey(c1.values)
-    # This triggers a log file creation
+
+    # This triggers a log file creation and a counter increment.
     stats_writer.logConnection(c1)
 
     # Read from the httpserver and assert the correct connection count.
@@ -71,10 +77,11 @@ class TestMonitoring(unittest.TestCase):
     else:
       raise urllib2.URLError('Page not found')
 
-    rex = re.compile( '^sidestream_connection_count[{]source=\"ipv4\"[}] (.*)$', re.M )
+    rex = re.compile(
+        '^sidestream_connection_count[{]lsb=\"33\",type=\"ipv4\"[}] (.*)$', re.M )
     count_line = rex.search(response)
     self.assertIsNotNone(count_line, response)
-    self.assertGreaterEqual(count_line.group(1), 1.0)
+    self.assertEqual(count_line.group(1), '1.0')
 
 one_hour = (60*60)
 

@@ -5,9 +5,11 @@ exitstats.py: Poll for newly closed connections and print their Web100
 stats.
 """
 
-import time
-import sys
 import os
+import re
+import sys
+import time
+
 from collections import namedtuple
 
 import prometheus_client as prom
@@ -20,7 +22,10 @@ except ImportError:
 PROMETHEUS_SERVER_PORT = 9090
 connection_count = prom.Counter('sidestream_connection_count',
                                 'Count of connections logged',
-                                ['source'])
+                                ['type', 'lsb'])
+exception_count = prom.Counter('sidestream_exception_count',
+                               'Count of exceptions.',
+                               ['type'])
 
 class Web100StatsWriter:
     ''' TODO - add documentation.
@@ -175,16 +180,31 @@ class Web100StatsWriter:
         # Count connections to loopback and Planet Lab Control (PLC),
         # but don't log them.
         remote = snap["RemAddress"]
+        # To allow counting connections to each slice, we parse the
+        # least significant bits of the local address.
+        local = snap["LocalAddress"]
+        if ':' in local:
+            ipv6 = re.match('[0-9A-Fa-f].*:([0-9A-Fa-f]{1,4})$', local)
+            lsb = int(ipv6.group(1),16) % 64
+        else:
+            ipv4 = re.match('[0-9].*\.([0-9]{1,3})$', local)
+            lsb = int(ipv4.group(1),16) % 64
+
         if remote == "127.0.0.1":
-            connection_count.labels('loopback').inc()
+            connection_count.labels('loopback-ipv4', '{}'.format(lsb)).inc()
+            return
+        elif re.match('ffff:7f00.*', remote, re.I) != None:  # ignore case
+            connection_count.labels('loopback-ipv6-', '{}'.format(lsb)).inc()
             return
         elif remote.startswith("128.112.139"):
-            connection_count.labels('plc').inc()
+            # TODO - do we have ipv6 addresses for PLC?
+            connection_count.labels('plc', '{}'.format(lsb)).inc()
             return
-        elif ':' in remote:
-            connection_count.labels('ipv6').inc()
-        else:
-            connection_count.labels('ipv4').inc()
+
+        if not ipv4 == None:
+            connection_count.labels('ipv4', '{}'.format(lsb)).inc()
+        elif not ipv6 == None:
+            connection_count.labels('ipv6', '{}'.format(lsb)).inc()
 
         # pick/open a logfile as needed, based on the close poll time
         t = time.time()
@@ -225,6 +245,10 @@ def main(argv):
                     if not c.cid in closed:
                         stats_writer.logConnection(c)
             except Exception, e:
+                # We should handle all exceptions deeper in the call stack.
+                # We instrument this so that we can detect exceptions and
+                # track them down.
+                exception_count.inc()
                 print e
                 pass
         closed = newclosed;
