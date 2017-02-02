@@ -16,6 +16,15 @@ import prometheus_client as prom
 from freezegun import freeze_time
 
 import exitstats
+
+def remove_file(logdir, logname):
+  ''' Utility to remove a file and its directory'''
+  try:
+    os.remove(logdir + logname)
+    os.removedirs(logdir)
+  except OSError:
+    pass
+
 class FakeConnection():
   '''Substitute for Web100 connection object for testing.'''
   cid = 0
@@ -83,6 +92,11 @@ class TestMonitoring(unittest.TestCase):
     self.assertIsNotNone(count_line, response)
     self.assertEqual(count_line.group(1), '1.0')
 
+    # Clean up files.
+    logdir = '2014/02/23/server/'
+    logname = '20140223T10:00:00Z_ALL0.web100'
+    remove_file(logdir, logname)
+
 one_hour = (60*60)
 
 class TestExitstats(unittest.TestCase):
@@ -91,14 +105,6 @@ class TestExitstats(unittest.TestCase):
   def setUp(self):
     global stats_writer
     stats_writer = exitstats.Web100StatsWriter('server/')
-
-  def remove_file(self, logdir, logname):
-    ''' Utility to remove a file and its directory'''
-    try:
-      os.remove(logdir + logname)
-      os.removedirs(logdir)
-    except OSError:
-      pass
 
   def assertExists(self, logdir, logname):
     '''Utility to assert that file exists'''
@@ -160,14 +166,14 @@ class TestExitstats(unittest.TestCase):
     logname = '20140223T10:00:00Z_ALL0.web100'
     stats_writer.server = server = 'server/'
 
-    self.remove_file(logdir, logname)
+    remove_file(logdir, logname)
     with EnvironmentVarGuard() as env:
       env.set('SIDESTREAM_USE_LOCAL_IP', 'False')
       self.assertFalse(stats_writer.useLocalIP())
       _ = stats_writer.getLogFile(time.time())
 
     self.assertExists(logdir, logname)
-    self.remove_file(logdir, logname)
+    remove_file(logdir, logname)
 
   @freeze_time("2014-02-23 10:23:34", tz_offset=0)
   def testGetLogFileOldBehaviorWithIP(self):
@@ -182,8 +188,8 @@ class TestExitstats(unittest.TestCase):
     logname_with_ip = '20140223T10:00:00Z_5.4.3.2_0.web100'
     stats_writer.server = server = 'server/'
 
-    self.remove_file(logdir, logname)
-    self.remove_file(logdir, logname_with_ip)
+    remove_file(logdir, logname)
+    remove_file(logdir, logname_with_ip)
     with EnvironmentVarGuard() as env:
       env.set('SIDESTREAM_USE_LOCAL_IP', 'False')
       self.assertFalse(stats_writer.useLocalIP())
@@ -197,8 +203,8 @@ class TestExitstats(unittest.TestCase):
     self.assertExists(logdir, logname)
 
     # Clean up
-    self.remove_file(logdir, logname)
-    self.remove_file(logdir, logname_with_ip)
+    remove_file(logdir, logname)
+    remove_file(logdir, logname_with_ip)
 
   @freeze_time("2014-02-23 10:23:34", tz_offset=0)
   def testGetLogFileWithLocalIP(self):
@@ -212,7 +218,7 @@ class TestExitstats(unittest.TestCase):
     logname = '20140223T10:00:00Z_5.4.3.2_0.web100'
     stats_writer.server = server = 'server/'
 
-    self.remove_file(logdir, logname)
+    remove_file(logdir, logname)
     with EnvironmentVarGuard() as env:
       env.set('SIDESTREAM_USE_LOCAL_IP', 'True')
       self.assertTrue(stats_writer.useLocalIP())
@@ -221,7 +227,7 @@ class TestExitstats(unittest.TestCase):
     self.assertExists(logdir, logname)
 
     # Clean up
-    self.remove_file(logdir, logname)
+    remove_file(logdir, logname)
 
   def testHourRolloverWithLocalIP(self):
     '''Check that log file cache is cleared at end of hour.'''
@@ -235,10 +241,10 @@ class TestExitstats(unittest.TestCase):
 
     logdir = '2014/02/23/server/'
     logname10 = '20140223T10:00:00Z_1.2.3.4_0.web100'
-    logname11 = '20140223T10:00:00Z_1.2.3.4_0.web100'
+    logname11 = '20140223T11:00:00Z_1.2.3.4_0.web100'
     # Clean up files possibly left over from previous tests.
-    self.remove_file(logdir, logname10)
-    self.remove_file(logdir, logname11)
+    remove_file(logdir, logname10)
+    remove_file(logdir, logname11)
 
     stats_writer.server = server = 'server/'
     with EnvironmentVarGuard() as env:
@@ -256,8 +262,8 @@ class TestExitstats(unittest.TestCase):
         self.assertExists(logdir, logname11)
 
     # Clean up
-    self.remove_file(logdir, logname10)
-    self.remove_file(logdir, logname11)
+    remove_file(logdir, logname10)
+    remove_file(logdir, logname11)
 
 if __name__ == '__main__':
   unittest.main()

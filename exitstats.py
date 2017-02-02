@@ -191,20 +191,20 @@ class Web100StatsWriter:
             lsb = int(ipv4.group(1),16) % 64
 
         if remote == "127.0.0.1":
-            connection_count.labels('loopback-ipv4', '{}'.format(lsb)).inc()
+            connection_count.labels('loopback-ipv4', '{0}'.format(lsb)).inc()
             return
         elif re.match('ffff:7f00.*', remote, re.I) != None:  # ignore case
-            connection_count.labels('loopback-ipv6-', '{}'.format(lsb)).inc()
+            connection_count.labels('loopback-ipv6-', '{0}'.format(lsb)).inc()
             return
         elif remote.startswith("128.112.139"):
             # TODO - do we have ipv6 addresses for PLC?
-            connection_count.labels('plc', '{}'.format(lsb)).inc()
+            connection_count.labels('plc', '{0}'.format(lsb)).inc()
             return
 
-        if not ipv4 == None:
-            connection_count.labels('ipv4', '{}'.format(lsb)).inc()
-        elif not ipv6 == None:
-            connection_count.labels('ipv6', '{}'.format(lsb)).inc()
+        if ':' in local:
+            connection_count.labels('ipv4', '{0}'.format(lsb)).inc()
+        else:
+            connection_count.labels('ipv6', '{0}'.format(lsb)).inc()
 
         # pick/open a logfile as needed, based on the close poll time
         t = time.time()
@@ -248,7 +248,7 @@ def main(argv):
                 # We should handle all exceptions deeper in the call stack.
                 # We instrument this so that we can detect exceptions and
                 # track them down.
-                exception_count.inc()
+                exception_count.labels('Exception').inc()
                 print e
                 pass
         closed = newclosed;
