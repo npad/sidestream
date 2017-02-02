@@ -225,6 +225,7 @@ def main(argv):
                     if not c.cid in closed:
                         stats_writer.logConnection(c)
             except Exception, e:
+                print e
                 pass
         closed = newclosed;
         # Wait 5 seconds before running polling again.
