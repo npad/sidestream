@@ -23,6 +23,7 @@ import exitstats
 class TestInternals(unittest.TestCase):
   def testConnectionType(self):
     w = exitstats.Web100StatsWriter("server/")
+    self.assertEquals(w.connectionType('128.112.139.23'), 'plc')
     self.assertEquals(w.connectionType('127.0.0.1'), 'loopback-ipv4')
     self.assertEquals(w.connectionType('ffff:7f00'), 'loopback-ipv6')
     self.assertEquals(w.connectionType('1000::0'), 'ipv6')
@@ -37,6 +38,7 @@ class TestInternals(unittest.TestCase):
     self.assertEquals(w.ipLastSixBits('1.2.3.4'), '4')
     self.assertEquals(w.ipLastSixBits('1.2.3.157'), '23')
     self.assertEquals(w.ipLastSixBits('bad-address'), 'unparsed')
+    self.assertEquals(w.ipLastSixBits('bad:address'), 'unparsed')
 
 
 def remove_file(logdir, logname):
@@ -282,10 +284,91 @@ class TestExitstats(unittest.TestCase):
         stats_writer.logConnection(c1)
 
         self.assertExists(logdir, logname11)
+        self.assertEqual(os.stat(logdir + logname11).st_size, 111L)
+        # These should cause additional writes to the same log,
+        # using the logname cache.
+        stats_writer.logConnection(c1)
+        stats_writer.logConnection(c1)
+        self.assertEqual(os.stat(logdir + logname11).st_size, 217L)
 
     # Clean up
     remove_file(logdir, logname10)
     remove_file(logdir, logname11)
+
+  def testIgnorePLCandLoopback(self):
+    '''Check that we do not log PLC or loopback connections.'''
+    # Ensure that the log file cache is empty.
+    stats_writer.closeLogs()
+
+    c1 = FakeConnection()
+    c1.cid = 1234
+    c1.setall({"RemAddress": "5.4.3.2", "LocalAddress": "1.2.3.4",
+               "LocalPort":432, "RemPort":234})
+    plc = FakeConnection()
+    plc.cid = 123
+    plc.setall({"RemAddress": "128.112.139.23", "LocalAddress": "1.2.3.4",
+               "LocalPort":432, "RemPort":234})
+    loopback4 = FakeConnection()
+    loopback4.cid = 123
+    loopback4.setall({"RemAddress": "127.0.0.1", "LocalAddress": "1.2.3.4",
+               "LocalPort":432, "RemPort":234})
+    loopback6 = FakeConnection()
+    loopback6.cid = 123
+    loopback6.setall({"RemAddress": "ffff:7f00::1", "LocalAddress": "1.2.3.4",
+               "LocalPort":432, "RemPort":234})
+
+    logdir = '2014/02/23/server/'
+    logname10 = '20140223T10:00:00Z_1.2.3.4_0.web100'
+    logname11 = '20140223T11:00:00Z_1.2.3.4_0.web100'
+    # Clean up files possibly left over from previous tests.
+    remove_file(logdir, logname10)
+    remove_file(logdir, logname11)
+
+    stats_writer.server = server = 'server/'
+    with EnvironmentVarGuard() as env:
+      env.set('SIDESTREAM_USE_LOCAL_IP', 'True')
+      with freeze_time("2014-02-23 10:23:34", tz_offset=0):
+        # This triggers a log file creation
+        stats_writer.logConnection(c1)
+
+        self.assertExists(logdir, logname10)
+
+      with freeze_time("2014-02-23 11:00:00", tz_offset=0):
+        # This triggers a log file creation
+        stats_writer.logConnection(c1)
+
+        self.assertExists(logdir, logname11)
+        self.assertEqual(os.stat(logdir + logname11).st_size, 111L)
+        # These should cause additional writes to the same log,
+        # using the logname cache.
+        stats_writer.logConnection(c1)
+        stats_writer.logConnection(c1)
+        self.assertEqual(os.stat(logdir + logname11).st_size, 217L)
+        # These should cause all be counted, but not logged.
+        stats_writer.logConnection(plc)
+        stats_writer.logConnection(loopback4)
+        stats_writer.logConnection(loopback6)
+        self.assertEqual(os.stat(logdir + logname11).st_size, 217L)
+
+    # Clean up
+    remove_file(logdir, logname10)
+    remove_file(logdir, logname11)
+
+  # Main may crash or run indefinitely, depending on whether Web100
+  # library is available.  Only test if it is not.
+  def testMainShouldCrash(self):
+    try:
+      import Web100
+      print('skipping main test, because it would run forever.')
+    except ImportError:
+      # Go ahead and test main...
+      try:
+        exitstats.main(("exitstats", "server"))
+      except NameError, e:
+        pass  # This is the expected behavior
+
+    # TODO(gfr) Consider adding tests for incorrect main arguments.
+
 
 if __name__ == '__main__':
   unittest.main()
