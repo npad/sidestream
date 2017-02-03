@@ -17,6 +17,28 @@ from freezegun import freeze_time
 
 import exitstats
 
+# TODO(gfr) Ideally we should use black box testing, but taking a shortcut
+# here to get decent test coverage.  Do not extend these tests until they
+# are converted to blackbox tests.
+class TestInternals(unittest.TestCase):
+  def testConnectionType(self):
+    w = exitstats.Web100StatsWriter("server/")
+    self.assertEquals(w.connectionType('127.0.0.1'), 'loopback-ipv4')
+    self.assertEquals(w.connectionType('ffff:7f00'), 'loopback-ipv6')
+    self.assertEquals(w.connectionType('1000::0'), 'ipv6')
+    self.assertEquals(w.connectionType('1000:2000:3000:4000::1234'), 'ipv6')
+    self.assertEquals(w.connectionType('1000::0'), 'ipv6')
+    self.assertEquals(w.connectionType('1.2.3.4'), 'ipv4')
+
+  def testIPLastSixBits(self):
+    w = exitstats.Web100StatsWriter("server/")
+    self.assertEquals(w.ipLastSixBits('1:2:3::5'), '5')
+    self.assertEquals(w.ipLastSixBits('1:2:3::b5'), '53')
+    self.assertEquals(w.ipLastSixBits('1.2.3.4'), '4')
+    self.assertEquals(w.ipLastSixBits('1.2.3.157'), '23')
+    self.assertEquals(w.ipLastSixBits('bad-address'), 'unparsed')
+
+
 def remove_file(logdir, logname):
   ''' Utility to remove a file and its directory'''
   try:
