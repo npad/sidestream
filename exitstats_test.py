@@ -113,7 +113,7 @@ class TestMonitoring(unittest.TestCase):
       raise urllib2.URLError('Page not found')
 
     rex = re.compile(
-        '^sidestream_connection_count[{]lsb=\"33\",type=\"ipv4\"[}] (.*)$', re.M )
+        r'^sidestream_connection_count[{]lsb="33",type="ipv4"[}] (.*)$', re.M )
     count_line = rex.search(response)
     self.assertIsNotNone(count_line, response)
     self.assertEqual(count_line.group(1), '1.0')

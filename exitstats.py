@@ -178,7 +178,7 @@ class Web100StatsWriter:
         ''' Parse the last six bits of an IP address into a decimal string.
         '''
         if ':' in local:
-            ipv6 = re.match('[0-9A-Fa-f].*:([0-9A-Fa-f]{1,4})$', local)
+            ipv6 = re.match(':{0,2}[0-9A-Fa-f].*:([0-9A-Fa-f]{1,4})$', local)
             if ipv6 == None:
                 print 'ipv6 address failed to match pattern: ' + local
                 exception_count.labels('ipv6 parse error').inc()
@@ -263,11 +263,11 @@ def main(argv):
                     newclosed.append(c.cid)
                     if not c.cid in closed:
                         stats_writer.logConnection(c)
-            except Exception, e:
+            except Exception as e:
                 # We should handle all exceptions deeper in the call stack.
                 # We instrument this so that we can detect exceptions and
                 # track them down.
-                exception_count.labels('Exception').inc()
+                exception_count.labels(type(e)).inc()
                 print e
                 pass
         closed = newclosed;
