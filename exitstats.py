@@ -184,17 +184,29 @@ class Web100StatsWriter:
         # least significant bits of the local address.
         local = snap["LocalAddress"]
         if ':' in local:
+            # TODO - occasionally this is not parsing, and the group() call
+            # throws an exception
             ipv6 = re.match('[0-9A-Fa-f].*:([0-9A-Fa-f]{1,4})$', local)
-            lsb = int(ipv6.group(1),16) % 64
+            if ipv6 == None:
+                print 'ipv6 address failed to match pattern: ' + local
+                exception_count.labels('ipv6 match').inc()
+                lsb = 255  # Illegal value
+            else:
+                lsb = int(ipv6.group(1),16) % 64
         else:
             ipv4 = re.match('[0-9].*\.([0-9]{1,3})$', local)
-            lsb = int(ipv4.group(1),16) % 64
+            if ipv4 == None:
+                print 'ipv4 address failed to match pattern: ' + local
+                exception_count.labels('ipv4 match').inc()
+                lsb = 255
+            else:
+                lsb = int(ipv4.group(1),16) % 64
 
         if remote == "127.0.0.1":
             connection_count.labels('loopback-ipv4', '{0}'.format(lsb)).inc()
             return
         elif re.match('ffff:7f00.*', remote, re.I) != None:  # ignore case
-            connection_count.labels('loopback-ipv6-', '{0}'.format(lsb)).inc()
+            connection_count.labels('loopback-ipv6', '{0}'.format(lsb)).inc()
             return
         elif remote.startswith("128.112.139"):
             # TODO - do we have ipv6 addresses for PLC?
@@ -202,9 +214,9 @@ class Web100StatsWriter:
             return
 
         if ':' in local:
-            connection_count.labels('ipv4', '{0}'.format(lsb)).inc()
-        else:
             connection_count.labels('ipv6', '{0}'.format(lsb)).inc()
+        else:
+            connection_count.labels('ipv4', '{0}'.format(lsb)).inc()
 
         # pick/open a logfile as needed, based on the close poll time
         t = time.time()
