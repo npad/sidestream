@@ -173,59 +173,64 @@ class Web100StatsWriter:
             self.logs[local_ip] = self.LogInfo(logdir+logname, logf)
             return logf
 
-    def logConnection(self, c):
-        snap = c.readall()
-        if not self.active_vars:
-            self.setkey(snap)
-        # Count connections to loopback and Planet Lab Control (PLC),
-        # but don't log them.
-        remote = snap["RemAddress"]
-        # To allow counting connections to each slice, we parse the
-        # least significant bits of the local address.
-        local = snap["LocalAddress"]
+
+    def ipLastSixBits(self, local):
+        ''' Parse the last six bits of an IP address into a decimal string.
+        '''
         if ':' in local:
-            # TODO - occasionally this is not parsing, and the group() call
-            # throws an exception
             ipv6 = re.match('[0-9A-Fa-f].*:([0-9A-Fa-f]{1,4})$', local)
             if ipv6 == None:
                 print 'ipv6 address failed to match pattern: ' + local
-                exception_count.labels('ipv6 match').inc()
-                lsb = 255  # Illegal value
+                exception_count.labels('ipv6 parse error').inc()
+                return 'unparsed'
             else:
-                lsb = int(ipv6.group(1),16) % 64
+                return '{0}'.format(int(ipv6.group(1),16) % 64)
         else:
             ipv4 = re.match('[0-9].*\.([0-9]{1,3})$', local)
             if ipv4 == None:
                 print 'ipv4 address failed to match pattern: ' + local
-                exception_count.labels('ipv4 match').inc()
-                lsb = 255
+                exception_count.labels('ipv4 parse error').inc()
+                return 'unparsed'
             else:
-                lsb = int(ipv4.group(1),16) % 64
+                return '{0}'.format(int(ipv4.group(1),16) % 64)
 
-        if remote == "127.0.0.1":
-            connection_count.labels('loopback-ipv4', '{0}'.format(lsb)).inc()
-            return
+    def connectionType(self, remote):
+        if remote == '127.0.0.1':
+            return 'loopback-ipv4'
         elif re.match('ffff:7f00.*', remote, re.I) != None:  # ignore case
-            connection_count.labels('loopback-ipv6', '{0}'.format(lsb)).inc()
-            return
+            return 'loopback-ipv6'
         elif remote.startswith("128.112.139"):
             # TODO - do we have ipv6 addresses for PLC?
-            connection_count.labels('plc', '{0}'.format(lsb)).inc()
-            return
+            return 'plc'
 
-        if ':' in local:
-            connection_count.labels('ipv6', '{0}'.format(lsb)).inc()
+        if ':' in remote:
+            return 'ipv6'
         else:
-            connection_count.labels('ipv4', '{0}'.format(lsb)).inc()
+            return 'ipv4'
 
-        # pick/open a logfile as needed, based on the close poll time
-        t = time.time()
-        logf = self.getLogFile(t, snap["LocalAddress"])
-        logf.write("C: %d %s"%(c.cid, time.strftime("%Y-%m-%d-%H:%M:%SZ", time.gmtime(t))))
-        for v in self.active_vars:
-            logf.write(" "+str(snap[v]))
-        logf.write("\n")
-        logf.flush()
+    def logConnection(self, c):
+        snap = c.readall()
+        if not self.active_vars:
+            self.setkey(snap)
+
+        # Update connection count.  Use the least significant bits
+        # of the local address to distinguish slices.
+        lsb = self.ipLastSixBits(snap["LocalAddress"])
+        conn_type = self.connectionType(snap["RemAddress"])
+        connection_count.labels(conn_type, lsb).inc()
+
+        # If it isn't loopback or plc, then log it.
+        if conn_type.startswith('ipv'):
+            # pick/open a logfile as needed, based on the close poll time
+            t = time.time()
+            logf = self.getLogFile(t, snap["LocalAddress"])
+            logf.write("C: %d %s"%
+                       (c.cid, time.strftime("%Y-%m-%d-%H:%M:%SZ",
+                                             time.gmtime(t))))
+            for v in self.active_vars:
+                logf.write(" "+str(snap[v]))
+            logf.write("\n")
+            logf.flush()
 
 # Main
 
