@@ -25,7 +25,8 @@ class TestInternals(unittest.TestCase):
     w = exitstats.Web100StatsWriter("server/")
     self.assertEquals(w.connectionType('128.112.139.23'), 'plc')
     self.assertEquals(w.connectionType('127.0.0.1'), 'loopback-ipv4')
-    self.assertEquals(w.connectionType('ffff:7f00'), 'loopback-ipv6')
+    self.assertEquals(w.connectionType('::ffff:7f00:1'), 'loopback-ipv6')
+    self.assertEquals(w.connectionType('::1'), 'loopback-ipv6')
     self.assertEquals(w.connectionType('1000::0'), 'ipv6')
     self.assertEquals(w.connectionType('1000:2000:3000:4000::1234'), 'ipv6')
     self.assertEquals(w.connectionType('1000::0'), 'ipv6')
@@ -78,7 +79,8 @@ class TestMonitoring(unittest.TestCase):
 
   def setUp(self):
     global stats_writer
-    prom.start_http_server(exitstats.PROMETHEUS_SERVER_PORT)
+    # Use port +1 so we don't collide with the main() test.
+    prom.start_http_server(exitstats.PROMETHEUS_SERVER_PORT+1)
     stats_writer = exitstats.Web100StatsWriter('server/')
 
   def tearDown(self):
@@ -99,7 +101,7 @@ class TestMonitoring(unittest.TestCase):
     stats_writer.logConnection(c1)
 
     # Read from the httpserver and assert the correct connection count.
-    url = "http://localhost:%s"%(exitstats.PROMETHEUS_SERVER_PORT)
+    url = "http://localhost:%s"%(exitstats.PROMETHEUS_SERVER_PORT+1)
     # Read in a while loop, since the server is a daemon and may not start immediately.
     for _ in range(1000):
       try:
@@ -314,7 +316,7 @@ class TestExitstats(unittest.TestCase):
                "LocalPort":432, "RemPort":234})
     loopback6 = FakeConnection()
     loopback6.cid = 123
-    loopback6.setall({"RemAddress": "ffff:7f00::1", "LocalAddress": "1.2.3.4",
+    loopback6.setall({"RemAddress": "::ffff:7f00:1", "LocalAddress": "1.2.3.4",
                "LocalPort":432, "RemPort":234})
 
     logdir = '2014/02/23/server/'

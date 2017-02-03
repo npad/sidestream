@@ -197,7 +197,9 @@ class Web100StatsWriter:
     def connectionType(self, remote):
         if remote == '127.0.0.1':
             return 'loopback-ipv4'
-        elif re.match('ffff:7f00.*', remote, re.I) != None:  # ignore case
+        elif remote == '::1':
+            return 'loopback-ipv6'
+        elif re.match('::ffff:7f00:1', remote, re.I) != None:  # ignore case
             return 'loopback-ipv6'
         elif remote.startswith("128.112.139"):
             # TODO - do we have ipv6 addresses for PLC?
