@@ -38,7 +38,11 @@ rm -f $LOGF
 (
 # Attempt to restart paris_rollins until /dev/shm is mounted by the vserver
 # start sequence.
-until paris_rollins.py -l $BASE/paris-traceroute ; do
+while true; do
+  if grep iupui_npad /proc/mounts; then
+    paris_rollins.py -l $BASE/paris-traceroute
+    break
+  fi
   sleep 1
 done &
 ) >> $LOGF 2>&1
