@@ -35,14 +35,13 @@ tdump8000.py $mynode &
 
 LOGF=$HOME/VAR/logs/paris-traceroute.log
 rm -f $LOGF
-(
-# Attempt to restart paris_rollins until /dev/shm is mounted by the vserver
-# start sequence.
+
+# Attempt to restart paris_rollins until /dev/shm/iupui_npad is mounted by the
+# vserver start sequence.
 while true; do
   if grep iupui_npad /proc/mounts; then
-    paris_rollins.py -l $BASE/paris-traceroute
+    paris_rollins.py -l $BASE/paris-traceroute >> $LOGF 2>&1 &
     break
   fi
   sleep 1
 done &
-) >> $LOGF 2>&1
