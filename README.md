@@ -1,4 +1,4 @@
-SideStream  [![Test Status](https://travis-ci.org/gfr10598/sidestream.svg?branch=master)](https://travis-ci.org/gfr10598/sidestream.svg?branch=master) [![Coverage Status](https://coveralls.io/repos/github/gfr10598/sidestream/badge.svg?branch=master)](https://coveralls.io/github/gfr10598/sidestream?branch=master)
+SideStream  [![Test Status](https://travis-ci.org/npad/sidestream.svg?branch=master)](https://travis-ci.org/npad/sidestream.svg?branch=master) [![Coverage Status](https://coveralls.io/repos/github/npad/sidestream/badge.svg?branch=master)](https://coveralls.io/github/npad/sidestream?branch=master)
 ==========
 
 Description of how SideStream works and the data that collects.
