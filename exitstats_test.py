@@ -34,10 +34,11 @@ class TestInternals(unittest.TestCase):
 
   def testIPLastSixBits(self):
     w = exitstats.Web100StatsWriter("server/")
-    self.assertEquals(w.ipLastSixBits('1:2:3::5'), '5')
-    self.assertEquals(w.ipLastSixBits('1:2:3::b5'), '53')
+    self.assertEquals(w.ipLastSixBits('1:2:3::5'), '5')  # 0x05
+    self.assertEquals(w.ipLastSixBits('1:2:3::b5'), '53') # 0x35
     self.assertEquals(w.ipLastSixBits('1.2.3.4'), '4')
-    self.assertEquals(w.ipLastSixBits('1.2.3.157'), '23')
+    self.assertEquals(w.ipLastSixBits('1.2.3.15'), '15')
+    self.assertEquals(w.ipLastSixBits('1.2.3.157'), '29')
     self.assertEquals(w.ipLastSixBits('bad-address'), 'unparsed')
     self.assertEquals(w.ipLastSixBits('bad:address'), 'unparsed')
 
@@ -112,8 +113,9 @@ class TestMonitoring(unittest.TestCase):
     else:
       raise urllib2.URLError('Page not found')
 
+    # Should see lsb = 57, (121 % 64)
     rex = re.compile(
-        r'^sidestream_connection_count[{]lsb="33",type="ipv4"[}] (.*)$', re.M )
+        r'^sidestream_connection_count[{]lsb="57",type="ipv4"[}] (.*)$', re.M )
     count_line = rex.search(response)
     self.assertIsNotNone(count_line, response)
     self.assertEqual(count_line.group(1), '1.0')
