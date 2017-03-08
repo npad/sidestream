@@ -192,7 +192,7 @@ class Web100StatsWriter:
                 exception_count.labels('ipv4 parse error').inc()
                 return 'unparsed'
             else:
-                return '{0}'.format(int(ipv4.group(1),16) % 64)
+                return '{0}'.format(int(ipv4.group(1),10) % 64)
 
     def connectionType(self, remote):
         if remote == '127.0.0.1':
