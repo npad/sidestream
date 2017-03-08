@@ -37,6 +37,16 @@ tdump8000.py $mynode &
 LOGF=$HOME/VAR/logs/paris-traceroute.log
 rm -f $LOGF
 
+
+# The wait for /dev/shm/iupui_npad must run in the background.
+#
+# If the wait below runs in the foreground, then we create a live lock because
+# 1) `vserver start` waits for the iupui_npad init scripts to return before
+# running the vserver `post-start` script that mounts /dev/shm/iupui_npad, and
+# 2) the npad initscript waits (here) for /dev/shm/iupui_npad to be mounted
+# before returning.
+#
+# Running this block here in the background prevents the live lock.
 (
 # Wait until /dev/shm/iupui_npad is mounted by the
 # vserver start sequence.
