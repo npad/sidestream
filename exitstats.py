@@ -5,9 +5,13 @@ exitstats.py: Poll for newly closed connections and print their Web100
 stats.
 """
 
+import BaseHTTPServer
 import os
 import re
+import socket
+import SocketServer
 import sys
+import threading
 import time
 
 from collections import namedtuple
@@ -26,6 +30,44 @@ connection_count = prom.Counter('sidestream_connection_count',
 exception_count = prom.Counter('sidestream_exception_count',
                                'Count of exceptions.',
                                ['type'])
+
+
+# NOTE: In practice, we are observing M-Lab servers holding ESTABLISHED TCP
+# connections when the remote end has disconnected (e.g. rsyncd, ndt, sidestream
+# exporter).
+#
+# To prevent this we need to set SO_KEEPALIVE on the connections so they
+# eventually reset.
+#
+# The function below is adapted from:
+#   https://github.com/prometheus/client_python/blob/master/prometheus_client
+def start_http_server(port, addr=''):
+    """Starts an HTTP server for prometheus metrics as a daemon thread"""
+    class ThreadingSimpleServer(SocketServer.ThreadingMixIn,
+                                BaseHTTPServer.HTTPServer):
+
+        def process_request(self, request, client_address):
+            """Set SO_KEEPALIVE on all new requests."""
+            # Enable keepalive on new connections.
+            request.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+
+            # Specify a non-system default idle time (default is 7200).
+            request.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 30)
+
+            # SocketServer types do not inherit from `object`, so super()
+            # does not work here.
+            return SocketServer.ThreadingMixIn.process_request(
+                self, request, client_address)
+
+    class PrometheusMetricsServer(threading.Thread):
+        def run(self):
+            httpd = ThreadingSimpleServer((addr, port), prom.MetricsHandler)
+            httpd.serve_forever()
+
+    t = PrometheusMetricsServer()
+    t.daemon = True
+    t.start()
+
 
 class Web100StatsWriter:
     ''' TODO - add documentation.
@@ -248,7 +290,7 @@ def main(argv):
         return 0
 
     # Start prometheus server to export metrics.
-    prom.start_http_server(PROMETHEUS_SERVER_PORT)
+    start_http_server(PROMETHEUS_SERVER_PORT)
 
     stats_writer = Web100StatsWriter(server)
 
