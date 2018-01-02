@@ -62,12 +62,23 @@ class ParisRollinsTestCase(unittest.TestCase):
   def test_recentcache(self):
     ip = self.TEST_DEST_IP
     cache_timeout = 2
-    cache = paris_rollins.RecentIPAddressCache(cache_timeout)
+    cache = paris_rollins.RecentIPAddressCache(cache_timeout, cache_timeout, cache_timeout)
     for cache_refreshes in range(3):
       self.assertFalse(cache.cached(ip))
       cache.add(ip)
       self.assertTrue(cache.cached(ip))
-      time.sleep(cache_timeout)
+      time.sleep(cache_timeout + .1)
+
+  def test_cache_randomness(self):
+    lo, av, hi = 1, 5, 100
+    cache = paris_rollins.RecentIPAddressCache(av, lo, hi)
+    times = []
+    for _ in range(1000):
+      times.append(cache._new_wait_time())
+    self.assertTrue(min(times) >= lo)
+    self.assertTrue(min(times) < hi)
+    self.assertTrue(max(times) <= hi)
+    self.assertTrue(max(times) > lo)
 
 
 if __name__ == '__main__':
