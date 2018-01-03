@@ -174,13 +174,12 @@ class RecentIPAddressCache(object):
       # Not in the cache or stale entry, so add a new entry.
       now = time.time()
       expiration = now + self._new_wait_time()
-      self.cache[address] = expiration
+      self.cache[address] = None
       heapq.heappush(self.heap, (expiration, address))
-      
+
   # Returns true if an address was seen too recently.
-  def cached(self, address, now=None):
-    if now is None:
-      now = time.time()
+  def cached(self, address):
+    now = time.time()
     self._expire(now)
     return address in self.cache
 

@@ -62,7 +62,11 @@ class ParisRollinsTestCase(unittest.TestCase):
   def test_recentcache(self):
     ip = self.TEST_DEST_IP
     cache_timeout = 2
-    cache = paris_rollins.RecentIPAddressCache(cache_timeout, cache_timeout, cache_timeout)
+    # Make the min, max, and mean timeouts all the same to enforce consistency.
+    cache = paris_rollins.RecentIPAddressCache(cache_timeout, cache_timeout,
+                                               cache_timeout)
+    # Repeatedly check the cache, add an IP to the cache, check the cache, then
+    # wait for expiration and (in the next loop iteration) re-check the cache.
     for cache_refreshes in range(3):
       self.assertFalse(cache.cached(ip))
       cache.add(ip)
