@@ -19,9 +19,11 @@
 # TODO(joshb): this is for experimental use only. The next step is to replace
 # the old wrapper with this one.
 
+import heapq
 import multiprocessing
 import optparse
 import os
+import random
 import re
 import subprocess
 import sys
@@ -56,8 +58,14 @@ WEB100_STATE_CLOSED = 1
 WEB100_IPV4 = 1
 # Base source port to use when running traceroute
 PARIS_TRACEROUTE_SOURCE_PORT_BASE = 33457
-# Do not traceroute to an IP more than once in this many seconds
-IP_CACHE_TIME_SECONDS = 120
+# Do not traceroute to an IP more than once in this many seconds. Randomness
+# added to prevent pattern propagation in the face of portscans and
+# rumplestiltskin attacks, but the wait time will always be a random number
+# between the min and max.
+MIN_IP_CACHE_TIME_SECONDS = 30
+MEAN_IP_CACHE_TIME_SECONDS = 120
+MAX_IP_CACHE_TIME_SECONDS = 600
+
 # Don't traceroute to these networks.
 # TODO(joshb): would be nice to use IP address library, but it isn't installed
 # on M-Lab.
@@ -136,37 +144,44 @@ def run_worker(log_file_root, log_time, mlab_hostname, traceroute_port,
 # Test if an IP address has been seen within the timeout period.
 class RecentIPAddressCache(object):
 
-  def __init__(self, cache_timeout):
-    self.cache_timeout = cache_timeout
-    self.address_cache = {}
-    self.address_cache_time_buckets = {}
+  def __init__(self, expected_cache_timeout, min_wait, max_wait):
+    self.expected_cache_timeout = expected_cache_timeout
+    self.min_wait = min_wait
+    self.max_wait = max_wait
+    # The cache maps addresses to expiration times.
+    self.cache = {}
+    # The heap holds (time, address) pairs, with the lowest time on top.
+    self.heap = []
+
+  # Calculate a new random expiration time. It should be memoryless, but we're
+  # willing to deviate from that requirement to prevent absurdly long or short
+  # wait times.
+  def _new_wait_time(self):
+    return max(self.min_wait, min(self.max_wait,
+        random.expovariate(1.0/self.expected_cache_timeout)))
 
   # Expire all addresses up to 2 cache timeout periods ago.
-  def expire(self, now):
-    expire_buckets = []
-    for bucket in self.address_cache_time_buckets.keys():
-      if bucket + self.cache_timeout < now:
-        expire_buckets.append(bucket)
-    for bucket in expire_buckets:
-      for address in self.address_cache_time_buckets[bucket]:
-        del self.address_cache[address]
-      del self.address_cache_time_buckets[bucket]
+  def _expire(self, now):
+    expired = []
+    while self.heap and self.heap[0][0] < now:
+      expired.append(heapq.heappop(self.heap))
+    for _, key in expired:
+      del self.cache[key]
 
   # Add an IP to the cache, if it isn't there already.
   def add(self, address):
     if not self.cached(address):
       # Not in the cache or stale entry, so add a new entry.
       now = time.time()
-      self.address_cache[address] = now
-      if now not in self.address_cache_time_buckets:
-        self.address_cache_time_buckets[now] = set()
-        self.address_cache_time_buckets[now].add(address)
+      expiration = now + self._new_wait_time()
+      self.cache[address] = None
+      heapq.heappush(self.heap, (expiration, address))
 
-  # Returns true if an address seen without one timeout period.
+  # Returns true if an address was seen too recently.
   def cached(self, address):
     now = time.time()
-    self.expire(now)
-    return address in self.address_cache
+    self._expire(now)
+    return address in self.cache
 
 
 # Manage a pool of worker subprocessors to run traceoutes in.
@@ -246,7 +261,9 @@ def get_mlab_hostname():
 if __name__ == '__main__':
     (options, args) = optparser.parse_args()
     mlab_hostname = get_mlab_hostname()
-    recent_ip_cache = RecentIPAddressCache(IP_CACHE_TIME_SECONDS)
+    recent_ip_cache = RecentIPAddressCache(MEAN_IP_CACHE_TIME_SECONDS,
+                                           min_wait=MIN_IP_CACHE_TIME_SECONDS,
+                                           max_wait=MAX_IP_CACHE_TIME_SECONDS)
     pool = ParisTraceroutePool(options.logpath)
     agent = Web100.Web100Agent()
 
