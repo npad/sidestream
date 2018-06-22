@@ -28,8 +28,8 @@ import re
 import subprocess
 import time
 
-# What binary to use for paris-traceroute
-PARIS_TRACEROUTE_BIN = '/usr/local/bin/paris-traceroute'
+# What binary to use for scamper
+SCAMPER_BIN = '/usr/local/google/home/yachang/go/src/github.com/yachang/scamper/scamper-cvs-20180529/scamper/scamper'
 # What binary to use for timeout (see comment about python/dependencies, above)
 TIMEOUT_BIN = '/usr/bin/timeout'
 # What binary to use for ss
@@ -39,7 +39,7 @@ WORKER_NICE = 19
 # paris-traceroute should take no longer than this to complete (timed out,
 # partial results will be discarded).
 WORKER_TIMEOUT = 60
-# Maximum number of paris-traceoutes to run simultaneously (requests to run
+# Maximum number of scamper thread to run simultaneously (requests to run
 # more will be discarded).
 MAX_WORKERS = 10
 # Base source port to use when running traceroute
@@ -74,15 +74,15 @@ def make_log_file_name(log_file_root, log_time, mlab_hostname, remote_ip,
   return log_file
 
 
-# Try to run paris-traceroute and log output to a file. We assume any
+# Try to run scamper and log output to a file. We assume any
 # errors are transient (Eg, temporarily out of disk space), so do not
 # crash if the run fails.
+# sudo ./scamper -I "tracelb -P icmp-echo -q 3 8.8.8.8" -O json
 def run_worker(log_file_root, log_time, mlab_hostname, traceroute_port,
                remote_ip, remote_port, local_ip, local_port):
   os.nice(WORKER_NICE)
-  command = (TIMEOUT_BIN, str(WORKER_TIMEOUT) + 's', PARIS_TRACEROUTE_BIN,
-             '--algo=exhaustive', '-picmp', '-s', str(traceroute_port), '-d',
-             str(remote_port), remote_ip)
+  command = (TIMEOUT_BIN, str(WORKER_TIMEOUT) + 's', SCAMPER_BIN,
+             '-I', '\"tracelb -P icmp-echo -q 3', remote_ip, '\" -O json')
   log_command = ' '.join(command)
   log_worker(log_command)
   log_file_name = make_log_file_name(log_file_root, log_time, mlab_hostname,
@@ -152,7 +152,7 @@ class RecentIPAddressCache(object):
 
 
 # Manage a pool of worker subprocessors to run traceoutes in.
-class ParisTraceroutePool(object):
+class ScamperPool(object):
 
   def __init__(self, log_file_root):
     self.pool = multiprocessing.Pool(processes=MAX_WORKERS)
@@ -308,7 +308,7 @@ def main():
   (options, _) = optparser.parse_args()
   mlab_hostname = get_mlab_hostname()
   recent_ip_cache = RecentIPAddressCache(IP_CACHE_TIME_SECONDS)
-  pool = ParisTraceroutePool(options.logpath)
+  pool = ScamperPool(options.logpath)
   agent = ConnectionWatcher()
 
   while True:
