@@ -29,11 +29,11 @@ import subprocess
 import time
 
 # What binary to use for scamper
-SCAMPER_BIN = '/usr/local/google/home/yachang/go/src/github.com/yachang/scamper/scamper-cvs-20180529/scamper/scamper'
+SCAMPER_BIN = '/usr/bin/scamper'
 # What binary to use for timeout (see comment about python/dependencies, above)
 TIMEOUT_BIN = '/usr/bin/timeout'
 # What binary to use for ss
-SS_BIN = '/usr/sbin/ss'
+SS_BIN = '/bin/ss'
 # paris-traceroute is run at this nice level, to minimize impact on the host.
 WORKER_NICE = 19
 # paris-traceroute should take no longer than this to complete (timed out,
@@ -41,7 +41,7 @@ WORKER_NICE = 19
 WORKER_TIMEOUT = 60
 # Maximum number of scamper thread to run simultaneously (requests to run
 # more will be discarded).
-MAX_WORKERS = 10
+MAX_WORKERS = 3
 # Base source port to use when running traceroute
 PARIS_TRACEROUTE_SOURCE_PORT_BASE = 33457
 # Do not traceroute to an IP more than once in this many seconds
@@ -77,23 +77,26 @@ def make_log_file_name(log_file_root, log_time, mlab_hostname, remote_ip,
 # Try to run scamper and log output to a file. We assume any
 # errors are transient (Eg, temporarily out of disk space), so do not
 # crash if the run fails.
-# sudo ./scamper -I "tracelb -P icmp-echo -q 3 8.8.8.8" -O json
+# /usr/bin/scamper -I "tracelb -P icmp-echo -q 3 8.8.8.8" -O json
 def run_worker(log_file_root, log_time, mlab_hostname, traceroute_port,
                remote_ip, remote_port, local_ip, local_port):
   os.nice(WORKER_NICE)
-  command = (TIMEOUT_BIN, str(WORKER_TIMEOUT) + 's', SCAMPER_BIN,
-             '-I', '\"tracelb -P icmp-echo -q 3', remote_ip, '\" -O json')
-  log_command = ' '.join(command)
-  log_worker(log_command)
   log_file_name = make_log_file_name(log_file_root, log_time, mlab_hostname,
                                      remote_ip, remote_port, local_ip,
                                      local_port)
   log_file_dir = os.path.dirname(log_file_name)
+  log_worker(log_file_name)
+  tracelb_string = 'tracelb -P icmp-echo -q 3 ' + remote_ip
+  command = ('/usr/bin/scamper', '-I', tracelb_string, '-O', 'json')
+  log_command = ' '.join(command)
+  log_worker(log_command)
+  
   if not os.path.exists(log_file_dir):
     try:
       os.makedirs(log_file_dir)
     # race with other worker - they created the directory first.
     except OSError:
+      log_worker('cannot create existing %s' % log_file_dir)
       pass
   if not os.path.exists(log_file_dir):
     log_worker('cannot create %s' % log_file_dir)
@@ -106,9 +109,7 @@ def run_worker(log_file_root, log_time, mlab_hostname, traceroute_port,
   try:
     returncode = subprocess.call(command, stdout=log_file)
     log_file.close()
-    if returncode != 0:
-      log_worker('%s returned %d' % (log_command, returncode))
-      return False
+    log_worker('%s returned %d' % (log_command, returncode))
   except OSError:
     log_worker('could not run %s' % log_command)
     return False
