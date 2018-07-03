@@ -87,7 +87,7 @@ def run_worker(log_file_root, log_time, mlab_hostname, traceroute_port,
   log_file_dir = os.path.dirname(log_file_name)
   log_worker(log_file_name)
   tracelb_string = 'tracelb -P icmp-echo -q 3 ' + remote_ip
-  command = ('/usr/bin/scamper', '-I', tracelb_string, '-O', 'json')
+  command = (TIMEOUT_BIN, str(WORKER_TIMEOUT) + 's', SCAMPER_BIN, '-I', tracelb_string, '-O', 'json')
   log_command = ' '.join(command)
   log_worker(log_command)
   
@@ -109,7 +109,9 @@ def run_worker(log_file_root, log_time, mlab_hostname, traceroute_port,
   try:
     returncode = subprocess.call(command, stdout=log_file)
     log_file.close()
-    log_worker('%s returned %d' % (log_command, returncode))
+    if returncode != 0:
+      log_worker('%s returned %d' % (log_command, returncode))
+      return False
   except OSError:
     log_worker('could not run %s' % log_command)
     return False
