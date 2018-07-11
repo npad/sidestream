@@ -29,11 +29,11 @@ import subprocess
 import time
 
 # What binary to use for scamper
-SCAMPER_BIN = '/usr/bin/scamper'
+SCAMPER_BIN = '/scamper'
 # What binary to use for timeout (see comment about python/dependencies, above)
-TIMEOUT_BIN = '/usr/bin/timeout'
+TIMEOUT_BIN = '/timeout'
 # What binary to use for ss
-SS_BIN = '/bin/ss'
+SS_BIN = '/ss'
 # paris-traceroute is run at this nice level, to minimize impact on the host.
 WORKER_NICE = 19
 # paris-traceroute should take no longer than this to complete (timed out,
