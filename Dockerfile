@@ -14,4 +14,4 @@ RUN chmod +x /scamper
 EXPOSE 7070
 # The :- syntax specifies a default value for the variable, so the deployment
 # need not set it unless you want to specify something other than that default.
-CMD /scamper.py
+CMD python /scamper.py
