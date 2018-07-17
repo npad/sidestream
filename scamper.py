@@ -29,7 +29,7 @@ import subprocess
 import time
 
 # What binary to use for scamper
-SCAMPER_BIN = '/source/scamper-cvs-20180529/scamper/scamper'
+SCAMPER_BIN = '/usr/local/bin/scamper'
 # What binary to use for timeout (see comment about python/dependencies, above)
 TIMEOUT_BIN = '/usr/bin/timeout'
 # What binary to use for ss

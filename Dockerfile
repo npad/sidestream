@@ -15,7 +15,10 @@ ADD source/scamper-cvs-20180529 /source/
 RUN chmod +x /source/configure
 RUN /source/configure
 RUN cd /source
+RUN ls -l /source/scamper
 RUN make
 RUN make install
+
+RUN chmod +x /usr/local/bin/scamper
 
 CMD ["python", "/scamper.py"]
