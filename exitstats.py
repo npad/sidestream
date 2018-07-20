@@ -28,11 +28,11 @@ connection_count = prom.Counter('sidestream_connection_count',
                                 'Count of connections logged',
                                 ['type', 'index'])
 transmit_bytes = prom.Counter('sidestream_transmit_bytes_total',
-                          'Count of bytes per experiment index',
-                          ['type', 'index'])
+                              'Count of bytes transmitted per experiment index',
+                              ['type', 'index'])
 receive_bytes = prom.Counter('sidestream_receive_bytes_total',
-                          'Count of bytes per experiment index',
-                          ['type', 'index'])
+                             'Count of bytes received per experiment index',
+                             ['type', 'index'])
 exception_count = prom.Counter('sidestream_exception_count',
                                'Count of exceptions.',
                                ['type'])
