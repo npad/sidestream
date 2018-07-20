@@ -32,15 +32,27 @@ class TestInternals(unittest.TestCase):
     self.assertEquals(w.connectionType('1000::0'), 'ipv6')
     self.assertEquals(w.connectionType('1.2.3.4'), 'ipv4')
 
-  def testIPLastSixBits(self):
+  def test_ipToIndex(self):
     w = exitstats.Web100StatsWriter("server/")
-    self.assertEquals(w.ipLastSixBits('1:2:3::5'), '5')  # 0x05
-    self.assertEquals(w.ipLastSixBits('1:2:3::b5'), '53') # 0x35
-    self.assertEquals(w.ipLastSixBits('1.2.3.4'), '4')
-    self.assertEquals(w.ipLastSixBits('1.2.3.15'), '15')
-    self.assertEquals(w.ipLastSixBits('1.2.3.157'), '29')
-    self.assertEquals(w.ipLastSixBits('bad-address'), 'unparsed')
-    self.assertEquals(w.ipLastSixBits('bad:address'), 'unparsed')
+    self.assertEquals(w.ipToIndex('1:2:3::567890'), 'invalid-octet') # Invalid octet.
+    self.assertEquals(w.ipToIndex('1:2:3::5'), 'invalid-octet')      # Invalid IP index.
+    self.assertEquals(w.ipToIndex('1:2:3::9'), 'host')  # host IP
+    self.assertEquals(w.ipToIndex('1:2:3::10'), '0')    # index 0 on mlab1
+    self.assertEquals(w.ipToIndex('1:2:3::23'), '0')    # index 0 on mlab2
+    self.assertEquals(w.ipToIndex('1:2:3::36'), '0')    # index 0 on mlab3
+    self.assertEquals(w.ipToIndex('1:2:3::49'), '0')    # index 0 on mlab4
+    self.assertEquals(w.ipToIndex('1:2:3::48'), 'host') # index 0 on mlab4
+
+    self.assertEquals(w.ipToIndex('1.2.3.567890'), 'invalid-octet') # Invalid octet.
+    self.assertEquals(w.ipToIndex('1.2.3.5'), 'invalid-octet')      # Invalid IP index.
+    self.assertEquals(w.ipToIndex('1.2.3.9'), 'host')   # host IP
+    self.assertEquals(w.ipToIndex('1.2.3.19'), '9')     # index 9 on mlab1
+    self.assertEquals(w.ipToIndex('1.2.3.32'), '9')     # index 9 on mlab2
+    self.assertEquals(w.ipToIndex('1.2.3.45'), '9')     # index 9 on mlab3
+    self.assertEquals(w.ipToIndex('1.2.3.58'), '9')     # index 9 on mlab4
+    self.assertEquals(w.ipToIndex('1.2.3.48'), 'host')     # index 9 on mlab4
+    self.assertEquals(w.ipToIndex('bad-address'), 'parse-error')
+    self.assertEquals(w.ipToIndex('bad:address'), 'parse-error')
 
 
 def remove_file(logdir, logname):
@@ -95,7 +107,8 @@ class TestMonitoring(unittest.TestCase):
     # Use IP address LSB that tests masking of last 6 bits, and is distinct
     # from bits in other tests, so we can verify the count.  121 % 64 = 33
     c1.setall({"RemAddress": "5.4.3.2", "LocalAddress": "1.2.3.121",
-               "LocalPort":432, "RemPort":234})
+               "LocalPort":432, "RemPort":234,
+               "DataBytesOut": 0, "DataBytesIn": 0})
     stats_writer.setkey(c1.values)
 
     # This triggers a log file creation and a counter increment.
@@ -115,7 +128,7 @@ class TestMonitoring(unittest.TestCase):
 
     # Should see lsb = 57, (121 % 64)
     rex = re.compile(
-        r'^sidestream_connection_count[{]lsb="57",type="ipv4"[}] (.*)$', re.M )
+        r'^sidestream_connection_count[{]index="8",type="ipv4"[}] (.*)$', re.M )
     count_line = rex.search(response)
     self.assertIsNotNone(count_line, response)
     self.assertEqual(count_line.group(1), '1.0')
@@ -265,7 +278,8 @@ class TestExitstats(unittest.TestCase):
     c1 = FakeConnection()
     c1.cid = 1234
     c1.setall({"RemAddress": "5.4.3.2", "LocalAddress": "1.2.3.4",
-               "LocalPort":432, "RemPort":234})
+               "LocalPort":432, "RemPort":234,
+               "DataBytesOut": 0, "DataBytesIn": 0})
 
     logdir = '2014/02/23/server/'
     logname10 = '20140223T10:00:00Z_1.2.3.4_0.web100'
@@ -288,12 +302,12 @@ class TestExitstats(unittest.TestCase):
         stats_writer.logConnection(c1)
 
         self.assertExists(logdir, logname11)
-        self.assertEqual(os.stat(logdir + logname11).st_size, 111L)
+        self.assertEqual(os.stat(logdir + logname11).st_size, 140L)
         # These should cause additional writes to the same log,
         # using the logname cache.
         stats_writer.logConnection(c1)
         stats_writer.logConnection(c1)
-        self.assertEqual(os.stat(logdir + logname11).st_size, 217L)
+        self.assertEqual(os.stat(logdir + logname11).st_size, 254L)
 
     # Clean up
     remove_file(logdir, logname10)
@@ -307,19 +321,23 @@ class TestExitstats(unittest.TestCase):
     c1 = FakeConnection()
     c1.cid = 1234
     c1.setall({"RemAddress": "5.4.3.2", "LocalAddress": "1.2.3.4",
-               "LocalPort":432, "RemPort":234})
+               "LocalPort":432, "RemPort":234,
+               "DataBytesOut": 0, "DataBytesIn": 0})
     plc = FakeConnection()
     plc.cid = 123
     plc.setall({"RemAddress": "128.112.139.23", "LocalAddress": "1.2.3.4",
-               "LocalPort":432, "RemPort":234})
+               "LocalPort":432, "RemPort":234,
+               "DataBytesOut": 0, "DataBytesIn": 0})
     loopback4 = FakeConnection()
     loopback4.cid = 123
     loopback4.setall({"RemAddress": "127.0.0.1", "LocalAddress": "1.2.3.4",
-               "LocalPort":432, "RemPort":234})
+               "LocalPort":432, "RemPort":234,
+               "DataBytesOut": 0, "DataBytesIn": 0})
     loopback6 = FakeConnection()
     loopback6.cid = 123
     loopback6.setall({"RemAddress": "::ffff:7f00:1", "LocalAddress": "1.2.3.4",
-               "LocalPort":432, "RemPort":234})
+               "LocalPort":432, "RemPort":234,
+               "DataBytesOut": 0, "DataBytesIn": 0})
 
     logdir = '2014/02/23/server/'
     logname10 = '20140223T10:00:00Z_1.2.3.4_0.web100'
@@ -342,17 +360,17 @@ class TestExitstats(unittest.TestCase):
         stats_writer.logConnection(c1)
 
         self.assertExists(logdir, logname11)
-        self.assertEqual(os.stat(logdir + logname11).st_size, 111L)
+        self.assertEqual(os.stat(logdir + logname11).st_size, 140L)
         # These should cause additional writes to the same log,
         # using the logname cache.
         stats_writer.logConnection(c1)
         stats_writer.logConnection(c1)
-        self.assertEqual(os.stat(logdir + logname11).st_size, 217L)
+        self.assertEqual(os.stat(logdir + logname11).st_size, 254L)
         # These should cause all be counted, but not logged.
         stats_writer.logConnection(plc)
         stats_writer.logConnection(loopback4)
         stats_writer.logConnection(loopback6)
-        self.assertEqual(os.stat(logdir + logname11).st_size, 217L)
+        self.assertEqual(os.stat(logdir + logname11).st_size, 254L)
 
     # Clean up
     remove_file(logdir, logname10)
