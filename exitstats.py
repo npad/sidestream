@@ -26,7 +26,13 @@ except ImportError:
 PROMETHEUS_SERVER_PORT = 9090
 connection_count = prom.Counter('sidestream_connection_count',
                                 'Count of connections logged',
-                                ['type', 'lsb'])
+                                ['type', 'index'])
+transmit_bytes = prom.Counter('sidestream_transmit_bytes_total',
+                          'Count of bytes per experiment index',
+                          ['type', 'index'])
+receive_bytes = prom.Counter('sidestream_receive_bytes_total',
+                          'Count of bytes per experiment index',
+                          ['type', 'index'])
 exception_count = prom.Counter('sidestream_exception_count',
                                'Count of exceptions.',
                                ['type'])
@@ -67,6 +73,32 @@ def start_http_server(port, addr=''):
     t = PrometheusMetricsServer()
     t.daemon = True
     t.start()
+
+
+def octetToIndex(octet):
+    """Converts the given octet to an M-Lab experiment index.
+
+    Because experiment indexes are zero-based, the host context will be -1.
+
+    Invalid octets or values that convert to invalid indexes will return -2.
+
+    Args:
+      octet: int, the last byte of the local IP address.
+    Returns:
+      index as string
+    """
+    # M-Lab host addresses start at 9.
+    octet -= 9
+    if octet < 0 or octet > 246:
+        exception_count.labels('invalid octet').inc()
+        return 'invalid-octet'
+    # M-Lab uses IPv4/26 address blocks of 64 addresses. Within that block, we
+    # allocate four machines of 13 addresses each.
+    index = (octet % 64) % 13
+    if index == 0:
+        return 'host'
+    # M-Lab experiments are zero-based.
+    return (index-1)
 
 
 class Web100StatsWriter:
@@ -215,26 +247,17 @@ class Web100StatsWriter:
             self.logs[local_ip] = self.LogInfo(logdir+logname, logf)
             return logf
 
-
-    def ipLastSixBits(self, local):
-        ''' Parse the last six bits of an IP address into a decimal string.
-        '''
-        if ':' in local:
-            ipv6 = re.match(':{0,2}[0-9A-Fa-f].*:([0-9A-Fa-f]{1,4})$', local)
-            if ipv6 == None:
-                print 'ipv6 address failed to match pattern: ' + local
-                exception_count.labels('ipv6 parse error').inc()
-                return 'unparsed'
-            else:
-                return '{0}'.format(int(ipv6.group(1),16) % 64)
+    def ipToIndex(self, local):
+        """Convert the last octet of a local IP to an experiment index str."""
+        # NOTE: due to https://github.com/m-lab/operator/issues/243 the last
+        # octet of IPv4 and IPv6 addresses should be parsable as base10 values.
+        last_octet = re.match('.*[:.]([0-9]+)$', local)
+        if last_octet == None:
+            print 'address failed to match pattern: ' + local
+            exception_count.labels('ip address parse error').inc()
+            return 'parse-error'
         else:
-            ipv4 = re.match('[0-9].*\.([0-9]{1,3})$', local)
-            if ipv4 == None:
-                print 'ipv4 address failed to match pattern: ' + local
-                exception_count.labels('ipv4 parse error').inc()
-                return 'unparsed'
-            else:
-                return '{0}'.format(int(ipv4.group(1),10) % 64)
+            return '{0}'.format(octetToIndex(int(last_octet.group(1),10)))
 
     def connectionType(self, remote):
         if remote == '127.0.0.1':
@@ -259,9 +282,14 @@ class Web100StatsWriter:
 
         # Update connection count.  Use the least significant bits
         # of the local address to distinguish slices.
-        lsb = self.ipLastSixBits(snap["LocalAddress"])
+        index = self.ipToIndex(snap["LocalAddress"])
         conn_type = self.connectionType(snap["RemAddress"])
-        connection_count.labels(conn_type, lsb).inc()
+        connection_count.labels(conn_type, index).inc()
+
+        # Count the 'Data*' fields to include retransmit data. TCP/IP headers
+        # are not included.
+        transmit_bytes.labels(conn_type, index).inc(snap["DataBytesOut"])
+        receive_bytes.labels(conn_type, index).inc(snap["DataBytesIn"])
 
         # If it isn't loopback or plc, then log it.
         if conn_type.startswith('ipv'):
