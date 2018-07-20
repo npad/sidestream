@@ -78,18 +78,19 @@ def start_http_server(port, addr=''):
 def octetToIndex(octet):
     """Converts the given octet to an M-Lab experiment index.
 
-    Because experiment indexes are zero-based, the host context will be -1.
+    Because experiment indexes are zero-based, the host context will be 'host'.
 
-    Invalid octets or values that convert to invalid indexes will return -2.
+    Invalid octets or values that convert to invalid indexes will return
+    'invalid-octet'.
 
     Args:
       octet: int, the last byte of the local IP address.
     Returns:
       index as string
     """
-    # M-Lab host addresses start at 9.
+    # M-Lab host addresses start at 9, and there are only 4 x 13-addr blocks.
     octet -= 9
-    if octet < 0 or octet > 246:
+    if octet < 0 or octet > 244:
         exception_count.labels('invalid octet').inc()
         return 'invalid-octet'
     # M-Lab uses IPv4/26 address blocks of 64 addresses. Within that block, we
