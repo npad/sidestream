@@ -21,4 +21,4 @@ RUN make install
 
 RUN chmod +x /usr/local/bin/scamper
 
-CMD ["python", "/scamper.py"]
+CMD ["python", "/scamper.py", "--logpath", "/var/spool/scamper"]
