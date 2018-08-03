@@ -224,9 +224,7 @@ def parse_ss_line(line, connections):
   # where the fields are separated by tabs or other whitespace
   fields = line.split()
   log_worker('actual len: %d' % len(fields))
-  for field in fields:
-    log_worker(field)
-  if len(fields) != 5:
+  if len(fields) != 4:
     log_worker('bad line: %s' % line)
     return
   state, _, local_ip_port, remote_ip_port = fields
@@ -235,10 +233,14 @@ def parse_ss_line(line, connections):
     log_worker('bad local_ip:port string: %s' % local_ip_port)
     return
   local_ip, local_port = local_ip_fields
+  if local_ip[0] == '[':
+    local_ip = local_ip[1:-1]
   remote_ip_fields = remote_ip_port.rsplit(':', 1)
   if len(remote_ip_fields) != 2:
     log_worker('bad remote_ip:port string: %s' % remote_ip_port)
   remote_ip, remote_port = remote_ip_fields
+  if remote_ip[0] == '[':
+    remote_ip = remote_ip[1:-1]
   connections[Connection(remote_ip, remote_port, local_ip, local_port)] = state
 
 
