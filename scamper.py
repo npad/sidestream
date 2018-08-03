@@ -81,6 +81,7 @@ def make_log_file_name(log_file_root, log_time, mlab_hostname, remote_ip,
 def run_worker(log_file_root, log_time, mlab_hostname, traceroute_port,
                remote_ip, remote_port, local_ip, local_port):
   os.nice(WORKER_NICE)
+  log_worker('here')
   log_file_name = make_log_file_name(log_file_root, log_time, mlab_hostname,
                                      remote_ip, remote_port, local_ip,
                                      local_port)
@@ -241,6 +242,7 @@ def parse_ss_line(line, connections):
   remote_ip, remote_port = remote_ip_fields
   if remote_ip[0] == '[':
     remote_ip = remote_ip[1:-1]
+  log_worker(remote_ip + ' ' + remote_port + ' ' + local_ip + ' ' + local_port)
   connections[Connection(remote_ip, remote_port, local_ip, local_port)] = state
 
 
