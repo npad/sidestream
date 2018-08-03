@@ -240,7 +240,9 @@ def parse_ss_line(line, connections):
     log_worker('bad remote_ip:port string: %s' % remote_ip_port)
   remote_ip, remote_port = remote_ip_fields
   if remote_ip[0] == '[':
+    log_worker('ipv6 before: ' + remote_ip)
     remote_ip = remote_ip[1:-1]
+    log_worker('ipv6 after: ' + remote_ip)
   connections[Connection(remote_ip, remote_port, local_ip, local_port)] = state
 
 
