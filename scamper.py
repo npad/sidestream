@@ -223,10 +223,10 @@ def parse_ss_line(line, connections):
   #  CLOSE-WAIT 1 0 2620:0:1003:413:ad1b:7f2:9992:63b2:33855 2607:f8b0:4006:808::2001:443
   # where the fields are separated by tabs or other whitespace
   fields = line.split()
-  if len(fields) != 4:
-    log_worker('actual len: %d' % len(fields))
-    for field in fields:
-      log_worker(field)
+  log_worker('actual len: %d' % len(fields))
+  for field in fields:
+    log_worker(field)
+  if len(fields) != 5:
     log_worker('bad line: %s' % line)
     return
   state, _, local_ip_port, remote_ip_port = fields
