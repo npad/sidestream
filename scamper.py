@@ -332,6 +332,7 @@ def main():
     log_time = time.time()
     connections = agent.uncached_closed_connections(recent_ip_cache)
     for remote_ip, remote_port, local_ip, local_port in connections:
+      log_worker('PT start: ' + remote_ip + ' ' + remote_port + ' ' + local_ip + ' ' + local_port)
       traceroute_port = (
           PARIS_TRACEROUTE_SOURCE_PORT_BASE + pool.busy_workers_count())
       pool.run_async(log_time, mlab_hostname, traceroute_port, remote_ip,
