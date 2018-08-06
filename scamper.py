@@ -329,7 +329,7 @@ class ConnectionWatcher(object):
 def main():
   (options, _) = optparser.parse_args()
   mlab_hostname = get_mlab_hostname()
-  log_worker(mlab_hostname)
+  log_worker('here is : ' + mlab_hostname)
   recent_ip_cache = RecentIPAddressCache(IP_CACHE_TIME_SECONDS)
   pool = ScamperPool(options.logpath)
   agent = ConnectionWatcher()
