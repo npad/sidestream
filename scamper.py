@@ -250,7 +250,7 @@ def parse_ss_line(line, connections):
   remote_ip, remote_port = remote_ip_fields
   if remote_ip[0] == '[':
     remote_ip = remote_ip[1:-1]
-  log_worker('parse ended here: ' + remote_ip + ' ' + remote_port + ' ' + local_ip + ' ' + local_port)
+  #log_worker('parse ended here: ' + remote_ip + ' ' + remote_port + ' ' + local_ip + ' ' + local_port)
   connections[Connection(remote_ip, remote_port, local_ip, local_port)] = state
 
 
