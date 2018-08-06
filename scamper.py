@@ -202,10 +202,14 @@ def ignore_ip(ip):
 # Otherwise return just hostname.
 def get_mlab_hostname():
   hostname = platform.node()
-  mlab_match = re.match(r'^(mlab\d+\.[a-z]{3}\d+)', hostname)
-  if mlab_match:
-    return mlab_match.group(1)
-  log_worker('no reg match: ' + hostname)
+  log_worker('reg match: ' + hostname)
+  #mlab_match = re.match(r'^(mlab\d+\.[a-z]{3}\d+)', hostname)
+  #if mlab_match:
+    # something is wrong, missing the last 't'
+  #   return mlab_match.group(1) + 't'
+  segments = hostname.split('.')
+  if len(segments) > 3:
+    return segments[0] + '.' + segments[1]
   return hostname
 
 # A struct to hold all the data about a connection
