@@ -81,14 +81,15 @@ def make_log_file_name(log_file_root, log_time, mlab_hostname, remote_ip,
 def run_worker(log_file_root, log_time, mlab_hostname, traceroute_port,
                remote_ip, remote_port, local_ip, local_port):
   os.nice(WORKER_NICE)
-  log_worker('here')
+  log_worker('reach here: ' + log_file_root + ' ' + mlab_hostname)
   log_file_name = make_log_file_name(log_file_root, log_time, mlab_hostname,
                                      remote_ip, remote_port, local_ip,
                                      local_port)
   log_file_dir = os.path.dirname(log_file_name)
   log_worker(log_file_name)
   tracelb_string = 'tracelb -P icmp-echo -q 3 ' + remote_ip
-  command = (TIMEOUT_BIN, str(WORKER_TIMEOUT) + 's', SCAMPER_BIN, '-I', tracelb_string, '-O', 'json')
+  #command = (TIMEOUT_BIN, str(WORKER_TIMEOUT) + 's', SCAMPER_BIN, '-I', tracelb_string, '-O', 'json')
+  command = (SCAMPER_BIN, '-I', tracelb_string, '-O', 'json')
   log_command = ' '.join(command)
   log_worker(log_command)
   
