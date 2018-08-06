@@ -229,11 +229,11 @@ def parse_ss_line(line, connections):
   if len(fields) != 4:
     log_worker('bad line: %s' % line)
     return
-  for field in fields:
-    log_worker(field)
+  #for field in fields:
+  #  log_worker(field)
   state, _, local_ip_port, remote_ip_port = fields
-  if state[-1] == '0':
-    state = state[:-1]
+  #if state[-1] == '0':
+  #  state = state[:-1]
   log_worker(state)
   local_ip_fields = local_ip_port.rsplit(':', 1)
   if len(local_ip_fields) != 2:
@@ -325,6 +325,7 @@ class ConnectionWatcher(object):
 def main():
   (options, _) = optparser.parse_args()
   mlab_hostname = get_mlab_hostname()
+  log_worker(mlab_hostname)
   recent_ip_cache = RecentIPAddressCache(IP_CACHE_TIME_SECONDS)
   pool = ScamperPool(options.logpath)
   agent = ConnectionWatcher()
