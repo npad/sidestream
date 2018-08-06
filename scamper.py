@@ -231,6 +231,8 @@ def parse_ss_line(line, connections):
   for field in fields:
     log_worker(field)
   state, _, local_ip_port, remote_ip_port = fields
+  if state[-1] = '0':
+    state = state[:-1]
   local_ip_fields = local_ip_port.rsplit(':', 1)
   if len(local_ip_fields) != 2:
     log_worker('bad local_ip:port string: %s' % local_ip_port)
