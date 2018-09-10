@@ -117,6 +117,7 @@ def run_worker(log_file_root, log_time, mlab_hostname, traceroute_port,
   except OSError:
     log_worker('could not run %s' % log_command)
     return False
+  log_worker('done with new test file: %s' % log_file_name)
   return True
 
 
