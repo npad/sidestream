@@ -11,7 +11,7 @@ ADD scamper.py /scamper.py
 RUN chmod +x /scamper.py
 
 RUN mkdir /source
-ADD source/scamper-cvs-20180529 /source/
+ADD source/scamper-cvs-20190113 /source/
 RUN chmod +x /source/configure
 RUN /source/configure
 RUN cd /source
