@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	//"github.com/m-lab/go/uuid"
@@ -26,12 +27,64 @@ type Connection struct {
 
 // The new test output filename is joint of hostname, server boot time, and socker TCO cookie.
 // like: pboothe2.nyc.corp.google.com_1548788619_00000000000084FF
-var IGNORE_IPV4_NETS = []string{"127.", "128.112.139."}
-
-// Base source port to use when running traceroute
-var PARIS_TRACEROUTE_SOURCE_PORT_BASE = 33457
+var IGNORE_IPV4_NETS = []string{"127.", "128.112.139.", "::ffff:127.0.0.1"}
 
 var SCAMPER_BIN = "/usr/local/bin/scamper"
+
+// ///////////////////////////////////////////////////////////////////////
+
+// Do not traceroute to an IP more than once in this many seconds
+var IP_CACHE_TIME_SECONDS = 120
+
+var MAX_CACHE_ENTRY = 1000
+
+type RecentIPCache struct {
+	cache map[string]int64
+	mu    sync.Mutex
+}
+
+func (m *RecentIPCache) New() {
+	m = &RecentIPCache{cache: make(map[string]int64, 1000)}
+	go func() {
+		for now := range time.Tick(time.Second) {
+			for k, v := range m.cache {
+				if now.Unix()-v > int64(IP_CACHE_TIME_SECONDS) {
+					m.mu.Lock()
+					delete(m.cache, k)
+					m.mu.Unlock()
+				}
+			}
+		}
+	}()
+	return
+}
+
+func (m *RecentIPCache) Len() int {
+	return len(m.cache)
+}
+
+func (m *RecentIPCache) Add(ip string) {
+	_, ok := m.cache[ip]
+	if !ok {
+		m.mu.Lock()
+		if m.cache == nil {
+			m.cache = make(map[string]int64, 1000)
+		}
+		m.cache[ip] = time.Now().Unix()
+		m.mu.Unlock()
+	}
+}
+
+func (m *RecentIPCache) Has(ip string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	_, ok := m.cache[ip]
+	return ok
+}
+
+var recentIPCache RecentIPCache
+
+// /////////////////////////////////////////////////////////////////////////////
 
 func MakeTestFilename(cookie string) (string, error) {
 	stat, err := os.Stat("/proc")
@@ -60,7 +113,12 @@ func GetConnections() []Connection {
 	for _, line := range lines {
 		conn, err := ParseSSLine(line)
 		if err == nil {
+			if recentIPCache.Has(conn.remote_ip) {
+				continue
+			}
+			recentIPCache.Add(conn.remote_ip)
 			connectionPool = append(connectionPool, *conn)
+			log.Printf("pool add IP: " + conn.remote_ip)
 		}
 	}
 	return connectionPool
@@ -130,7 +188,7 @@ func ParseSSLine(line string) (*Connection, error) {
 }
 
 func RunScamper(conn Connection) {
-	command := exec.Command("/usr/local/bin/scamper", "-O", "json", "-I", "tracelb -P icmp-echo -q 3 -O ptr "+conn.remote_ip)
+	command := exec.Command(SCAMPER_BIN, "-O", "json", "-I", "tracelb -P icmp-echo -q 3 -O ptr "+conn.remote_ip)
 	filename, err := MakeTestFilename(conn.cookie)
 	if err != nil {
 		return
@@ -174,6 +232,7 @@ func RunScamper(conn Connection) {
 }
 
 func main() {
+	recentIPCache.New()
 	pool := GetConnections()
 	count := 0
 	for true {
@@ -182,7 +241,7 @@ func main() {
 				count = 0
 				break
 			}
-			log.Printf("PT start: %s %d %s %d", conn.remote_ip, conn.remote_port, conn.local_ip, conn.local_port)
+			log.Printf("PT start: %s %d", conn.remote_ip, conn.remote_port)
 			count++
 			go RunScamper(conn)
 		}
