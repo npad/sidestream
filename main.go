@@ -38,7 +38,10 @@ func MakeTestFilename(cookie string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s_%d_%s", os.Hostname, stat.ModTime().Unix(), cookie), nil
+	hostname, err := exec.Command("hostname").Output()
+	out := string(hostname)
+	out = strings.TrimSuffix(out, "\n")
+	return fmt.Sprintf("%s_%d_%s", out, stat.ModTime().Unix(), cookie), nil
 }
 
 func GetConnections() []Connection {
@@ -127,14 +130,12 @@ func ParseSSLine(line string) (*Connection, error) {
 }
 
 func RunScamper(conn Connection) {
-	tracelbString := "tracelb -P icmp-echo -q 3 -O ptr " + conn.remote_ip
-
-	command := exec.Command(SCAMPER_BIN, "-O", "json", "-I", tracelbString)
+	command := exec.Command("/usr/local/bin/scamper", "-O", "json", "-I", "tracelb -P icmp-echo -q 3 -O ptr "+conn.remote_ip)
 	filename, err := MakeTestFilename(conn.cookie)
 	if err != nil {
 		return
 	}
-	log.Println(filename)
+	log.Println("filename: " + filename)
 
 	var outbuf, errbuf bytes.Buffer
 
@@ -144,7 +145,7 @@ func RunScamper(conn Connection) {
 
 	err = command.Run()
 	if err != nil {
-		log.Printf("failed call: %v", err)
+		log.Printf("failed call for: %v", err)
 		return
 	}
 
@@ -174,9 +175,15 @@ func RunScamper(conn Connection) {
 
 func main() {
 	pool := GetConnections()
+	count := 0
 	for true {
 		for _, conn := range pool {
+			if count > 5 {
+				count = 0
+				break
+			}
 			log.Printf("PT start: %s %d %s %d", conn.remote_ip, conn.remote_port, conn.local_ip, conn.local_port)
+			count++
 			go RunScamper(conn)
 		}
 		time.Sleep(5 * time.Second)
