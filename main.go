@@ -68,7 +68,7 @@ func (m *RecentIPCache) Add(ip string) {
 	if !ok {
 		m.mu.Lock()
 		if m.cache == nil {
-			m.cache = make(map[string]int64, 1000)
+			m.cache = make(map[string]int64)
 		}
 		m.cache[ip] = time.Now().Unix()
 		m.mu.Unlock()
@@ -94,7 +94,10 @@ func MakeTestFilename(cookie string) (string, error) {
 	hostname, err := exec.Command("hostname").Output()
 	out := string(hostname)
 	out = strings.TrimSuffix(out, "\n")
-	return fmt.Sprintf("%s_%d_%s", out, stat.ModTime().Unix(), cookie), nil
+
+	// cookie is a hexdecimal string
+	result, _ := strconv.ParseUint(cookie, 16, 64)
+	return fmt.Sprintf("%s_%d_%016X", out, stat.ModTime().Unix(), uint64(result)), nil
 }
 
 func GetConnections() []Connection {
@@ -119,6 +122,7 @@ func GetConnections() []Connection {
 			recentIPCache.Add(conn.remote_ip)
 			connectionPool = append(connectionPool, *conn)
 			log.Printf("pool add IP: " + conn.remote_ip)
+			log.Printf("cache length : %d", recentIPCache.Len())
 		}
 	}
 	return connectionPool
@@ -187,6 +191,25 @@ func ParseSSLine(line string) (*Connection, error) {
 	return output, nil
 }
 
+// CreateTimePath return a string with date in format yyyy/mm/dd/
+func CreateTimePath(prefix string) string {
+	currentTime := time.Now().Format("2006-01-02")
+	date := strings.Split(currentTime, "-")
+	if len(date) != 3 {
+		return ""
+	}
+	if _, err := os.Stat(prefix + date[0]); os.IsNotExist(err) {
+		os.Mkdir(prefix+date[0], 0700)
+	}
+	if _, err := os.Stat(prefix + date[0] + "/" + date[1]); os.IsNotExist(err) {
+		os.Mkdir(prefix+date[0]+"/"+date[1], 0700)
+	}
+	if _, err := os.Stat(prefix + date[0] + "/" + date[1] + "/" + date[2]); os.IsNotExist(err) {
+		os.Mkdir(prefix+date[0]+"/"+date[1]+"/"+date[2], 0700)
+	}
+	return prefix + date[0] + "/" + date[1] + "/" + date[2] + "/"
+}
+
 func RunScamper(conn Connection) {
 	command := exec.Command(SCAMPER_BIN, "-O", "json", "-I", "tracelb -P icmp-echo -q 3 -O ptr "+conn.remote_ip)
 	filename, err := MakeTestFilename(conn.cookie)
@@ -215,9 +238,10 @@ func RunScamper(conn Connection) {
 		return
 	}
 
-	filepath := "./scamper_output/" + filename
+	filepath := CreateTimePath("./scamper_output/")
+	log.Println(filepath)
 
-	f, err := os.Create(filepath)
+	f, err := os.Create(filepath + filename)
 	if err != nil {
 		return
 	}
