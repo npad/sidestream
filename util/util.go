@@ -1,20 +1,15 @@
 package util
 
 import (
-	//"bufio"
-	//"bytes"
 	"errors"
 	"fmt"
-	//"log"
 	"net"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
-	//"syscall"
 	"time"
-	//"github.com/m-lab/go/uuid"
 )
 
 // The new test output filename is joint of hostname, server boot time, and socker TCO cookie.

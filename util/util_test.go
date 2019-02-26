@@ -1,15 +1,7 @@
 package util_test
 
 import (
-	//"bufio"
-	//"bytes"
-	//"errors"
-	//"fmt"
-	//"log"
-	//"os"
-	//"os/exec"
 	"strings"
-	//"syscall"
 	"testing"
 	"time"
 
