@@ -90,7 +90,7 @@ func CreateTimePath(prefix string) string {
 // ///////////////////////////////////////////////////////////////////////
 
 // Do not traceroute to an IP more than once in this many seconds
-var IP_CACHE_TIME_SECONDS = 120
+var IP_CACHE_TIME_SECONDS = 20
 
 var MAX_CACHE_ENTRY = 1000
 
@@ -103,7 +103,9 @@ func (m *RecentIPCache) New() {
 	m = &RecentIPCache{cache: make(map[string]int64, 1000)}
 	go func() {
 		for now := range time.Tick(time.Second) {
+			fmt.Println(now.Unix())
 			for k, v := range m.cache {
+				fmt.Println(v)
 				if now.Unix()-v > int64(IP_CACHE_TIME_SECONDS) {
 					m.mu.Lock()
 					delete(m.cache, k)
@@ -111,6 +113,7 @@ func (m *RecentIPCache) New() {
 				}
 			}
 		}
+
 	}()
 	return
 }
@@ -127,6 +130,7 @@ func (m *RecentIPCache) Add(ip string) {
 			m.cache = make(map[string]int64)
 		}
 		m.cache[ip] = time.Now().Unix()
+		fmt.Println(m.cache[ip])
 		m.mu.Unlock()
 	}
 }
