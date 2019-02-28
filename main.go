@@ -55,7 +55,7 @@ func ParseSSLine(line string) (*Connection, error) {
 	}
 
 	output := &Connection{remote_ip: remoteIP, remote_port: remotePort, local_ip: localIP, local_port: localPort, cookie: cookie}
-	log.Println(output)
+	//log.Println(output)
 	return output, nil
 }
 
@@ -78,10 +78,11 @@ func GetConnections() []Connection {
 			if recentIPCache.Has(conn.remote_ip) {
 				continue
 			}
+			log.Printf("Try to add " + conn.remote_ip)
 			recentIPCache.Add(conn.remote_ip)
 			connectionPool = append(connectionPool, *conn)
 			log.Printf("pool add IP: " + conn.remote_ip)
-			log.Printf("cache length : %d", recentIPCache.Len())
+			log.Printf("cache length : %d at %d", recentIPCache.Len(), time.Now().Unix())
 		}
 	}
 	return connectionPool
@@ -138,7 +139,7 @@ func main() {
 	count := 0
 	for true {
 		for _, conn := range pool {
-			if count > 5 {
+			if count > 10 {
 				count = 0
 				break
 			}

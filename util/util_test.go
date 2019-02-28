@@ -43,7 +43,7 @@ func TestRecentIPCache(t *testing.T) {
 		t.Error("cache not working correctly")
 	}
 
-	time.Sleep(21 * time.Second)
+	time.Sleep(122 * time.Second)
 	if tmp.Has("1.2.3.4") {
 		t.Error("cache not expire correctly")
 	}
