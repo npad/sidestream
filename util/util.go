@@ -28,6 +28,7 @@ func MakeTestFilename(cookie string) (string, error) {
 	// cookie is a hexdecimal string
 	result, _ := strconv.ParseUint(cookie, 16, 64)
 	return fmt.Sprintf("%s_%d_%016X", out, stat.ModTime().Unix(), uint64(result)), nil
+        //return fmt.Sprintf("%s_%d_%016X", out, time.Now().Unix(), uint64(result)), nil
 }
 
 func ParseIPAndPort(input string) (string, int, error) {
@@ -105,7 +106,7 @@ func (m *RecentIPCache) New() {
 			//fmt.Printf("func Tick: Now is %d, length of cache: %d \n", now.Unix(), len(m.cache))
 
 			for k, v := range m.cache {
-				fmt.Printf("entry %s is %d\n", k, v)
+				//fmt.Printf("entry %s is %d\n", k, v)
 				if now.Unix()-v > int64(IP_CACHE_TIME_SECONDS) {
 					fmt.Println("try to delete " + k)
 					m.mu.Lock()
@@ -149,7 +150,7 @@ func (m *RecentIPCache) Add(ip string) {
 func (m *RecentIPCache) Has(ip string) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	fmt.Printf("func Has: Now is %d, length of cache: %d \n", time.Now().Unix(), m.Len())
+	//fmt.Printf("func Has: Now is %d, length of cache: %d \n", time.Now().Unix(), m.Len())
 	if m.Len() == 0 {
 		return false
 	}

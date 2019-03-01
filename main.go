@@ -19,8 +19,6 @@ import (
 var SCAMPER_BIN = "/usr/local/bin/scamper"
 var OUTPUT_PATH = "./scamper_output/"
 
-var recentIPCache util.RecentIPCache
-
 type Connection struct {
 	remote_ip   string
 	remote_port int
@@ -57,35 +55,6 @@ func ParseSSLine(line string) (*Connection, error) {
 	output := &Connection{remote_ip: remoteIP, remote_port: remotePort, local_ip: localIP, local_port: localPort, cookie: cookie}
 	//log.Println(output)
 	return output, nil
-}
-
-func GetConnections() []Connection {
-	cmd := exec.Command("ss", "-e")
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	lines := strings.Split(out.String(), "\n")
-	var connectionPool []Connection
-	for _, line := range lines {
-		conn, err := ParseSSLine(line)
-		if err == nil {
-			if recentIPCache.Has(conn.remote_ip) {
-				continue
-			}
-			log.Printf("Try to add " + conn.remote_ip)
-			recentIPCache.Add(conn.remote_ip)
-			connectionPool = append(connectionPool, *conn)
-			log.Printf("pool add IP: " + conn.remote_ip)
-			log.Printf("cache length : %d at %d", recentIPCache.Len(), time.Now().Unix())
-		}
-	}
-	return connectionPool
 }
 
 func RunScamper(conn Connection) {
@@ -133,18 +102,69 @@ func RunScamper(conn Connection) {
 	w.Flush()
 }
 
+//////////////////////////////////////////////////////////////
+
+type ConnectionWatcher struct {
+	recentIPCache  util.RecentIPCache
+	connectionPool map[Connection]bool
+}
+
+func (c *ConnectionWatcher) GetConnections() {
+	cmd := exec.Command("ss", "-e")
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	lines := strings.Split(out.String(), "\n")
+	c.connectionPool = make(map[Connection]bool)
+	for _, line := range lines {
+		conn, err := ParseSSLine(line)
+		if err == nil {
+			c.connectionPool[*conn] = true
+			//log.Printf("pool add IP: " + conn.remote_ip)
+		}
+	}
+}
+
+func (c *ConnectionWatcher) GetClosedCollection() []Connection {
+	oldConn := c.connectionPool
+	fmt.Printf("old connection size %d\n", len(oldConn))
+	c.GetConnections()
+	fmt.Printf("new connection size %d\n", len(c.connectionPool))
+	var closed []Connection
+	for conn, _ := range oldConn {
+		if !c.connectionPool[conn] && !c.recentIPCache.Has(conn.remote_ip) {
+			closed = append(closed, conn)
+			log.Printf("Try to add " + conn.remote_ip)
+			c.recentIPCache.Add(conn.remote_ip)
+			log.Printf("cache length : %d at %d", c.recentIPCache.Len(), time.Now().Unix())
+		}
+	}
+	return closed
+}
+
+func (c *ConnectionWatcher) Init() {
+	c.recentIPCache.New()
+	c.connectionPool = make(map[Connection]bool)
+}
+
+var connWatcher ConnectionWatcher
+
+///////////////////////////////////////////////////
+
 func main() {
-	recentIPCache.New()
-	pool := GetConnections()
-	count := 0
+	connWatcher.GetConnections()
+	//count := 0
 	for true {
-		for _, conn := range pool {
-			if count > 10 {
-				count = 0
-				break
-			}
+		closedCollection := connWatcher.GetClosedCollection()
+		fmt.Printf("length of closed connections: %d\n", len(closedCollection))
+		for _, conn := range closedCollection {
 			log.Printf("PT start: %s %d", conn.remote_ip, conn.remote_port)
-			count++
 			go RunScamper(conn)
 		}
 		time.Sleep(5 * time.Second)
