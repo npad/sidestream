@@ -16,19 +16,29 @@ import (
 // like: pboothe2.nyc.corp.google.com_1548788619_00000000000084FF
 var IGNORE_IPV4_NETS = []string{"127.", "128.112.139.", "::ffff:127.0.0.1"}
 
-func MakeTestFilename(cookie string) (string, error) {
+// MakeFilename as logtime_
+// 2019-02-04T18:01:10Z-76.14.89.46.json
+func MakeFilename(ip string) string {
+	t := time.Now()
+	return fmt.Sprintf("%s-%s.json", t.Format(time.RFC3339), ip)
+
+}
+
+func GetHostname() string {
+	hostname, _ := exec.Command("hostname").Output()
+	out := string(hostname)
+	return strings.TrimSuffix(out, "\n")
+}
+
+func MakeUUID(cookie string) (string, error) {
 	stat, err := os.Stat("/proc")
 	if err != nil {
 		return "", err
 	}
-	hostname, err := exec.Command("hostname").Output()
-	out := string(hostname)
-	out = strings.TrimSuffix(out, "\n")
 
 	// cookie is a hexdecimal string
 	result, _ := strconv.ParseUint(cookie, 16, 64)
-	return fmt.Sprintf("%s_%d_%016X", out, stat.ModTime().Unix(), uint64(result)), nil
-        //return fmt.Sprintf("%s_%d_%016X", out, time.Now().Unix(), uint64(result)), nil
+	return fmt.Sprintf("%s_%d_%016X", GetHostname(), stat.ModTime().Unix(), uint64(result)), nil
 }
 
 func ParseIPAndPort(input string) (string, int, error) {
@@ -64,6 +74,16 @@ func ParseCookie(input string) (string, error) {
 	return input[3:], nil
 }
 
+// GetHostnamePrefix returns first two seg, like "mlab1.ath03" from hostname.
+func GetHostnamePrefix() string {
+	hostname := GetHostname()
+	segs := strings.Split(hostname, ".")
+	if len(segs) < 2 {
+		return hostname
+	}
+	return segs[0] + "." + segs[1]
+}
+
 // CreateTimePath return a string with date in format yyyy/mm/dd/
 func CreateTimePath(prefix string) string {
 	currentTime := time.Now().Format("2006-01-02")
@@ -80,7 +100,11 @@ func CreateTimePath(prefix string) string {
 	if _, err := os.Stat(prefix + date[0] + "/" + date[1] + "/" + date[2]); os.IsNotExist(err) {
 		os.Mkdir(prefix+date[0]+"/"+date[1]+"/"+date[2], 0700)
 	}
-	return prefix + date[0] + "/" + date[1] + "/" + date[2] + "/"
+	hostnamePrefix := GetHostnamePrefix()
+	if _, err := os.Stat(prefix + date[0] + "/" + date[1] + "/" + date[2] + "/" + hostnamePrefix); os.IsNotExist(err) {
+		os.Mkdir(prefix+date[0]+"/"+date[1]+"/"+date[2]+"/"+hostnamePrefix, 0700)
+	}
+	return prefix + date[0] + "/" + date[1] + "/" + date[2] + "/" + hostnamePrefix + "/"
 }
 
 // ///////////////////////////////////////////////////////////////////////

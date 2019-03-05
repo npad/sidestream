@@ -8,8 +8,8 @@ import (
 	"github.com/npad/sidestream/util"
 )
 
-func TestMakeTestFilename(t *testing.T) {
-	tmp, err := util.MakeTestFilename("1be3")
+func TestMakeUUID(t *testing.T) {
+	tmp, err := util.MakeUUID("1be3")
 	s := strings.Split(tmp, "_")
 	if err != nil || len(s) != 3 || s[2] != "0000000000001BE3" {
 		t.Error("Test filename incorrect")
@@ -35,7 +35,7 @@ func TestParseCookie(t *testing.T) {
 	}
 }
 
-func TestRecentIPCache(t *testing.T) {
+func xTestRecentIPCache(t *testing.T) {
 	var tmp util.RecentIPCache
 	tmp.New()
 	tmp.Add("1.2.3.4")
@@ -46,5 +46,12 @@ func TestRecentIPCache(t *testing.T) {
 	time.Sleep(122 * time.Second)
 	if tmp.Has("1.2.3.4") {
 		t.Error("cache not expire correctly")
+	}
+}
+
+func TestMakeFilename(t *testing.T) {
+	fn := util.MakeFilename("1.2.3.4")
+	if !strings.Contains(fn, "-1.2.3.4.json") {
+		t.Errorf("filename not created correctly %s", fn)
 	}
 }

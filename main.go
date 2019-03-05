@@ -59,11 +59,11 @@ func ParseSSLine(line string) (*Connection, error) {
 
 func RunScamper(conn Connection) {
 	command := exec.Command(SCAMPER_BIN, "-O", "json", "-I", "tracelb -P icmp-echo -q 3 -O ptr "+conn.remote_ip)
-	filename, err := util.MakeTestFilename(conn.cookie)
+	uuid, err := util.MakeUUID(conn.cookie)
 	if err != nil {
 		return
 	}
-	log.Println("filename: " + filename)
+	log.Println("uuid: " + uuid)
 
 	var outbuf, errbuf bytes.Buffer
 
@@ -88,13 +88,16 @@ func RunScamper(conn Connection) {
 	filepath := util.CreateTimePath(OUTPUT_PATH)
 	log.Println(filepath)
 
+        filename := util.MakeFilename(conn.remote_ip)
+
 	f, err := os.Create(filepath + filename)
 	if err != nil {
 		return
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
-	n, err := w.WriteString(outbuf.String())
+        uuidString := "{\"uuid\":\"" + uuid + "\"}\n"
+	n, err := w.WriteString(uuidString + outbuf.String())
 	if err != nil {
 		return
 	}
