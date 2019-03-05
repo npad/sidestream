@@ -23,7 +23,7 @@ FROM golang:alpine as build
 
 RUN apk update && apk add bash git pkgconfig
 ADD . /go/src/github.com/npad/sidestream/blob/scamper
-RUN go get github.com/npad/sidestream/blob/scamper
+RUN go build github.com/npad/sidestream/blob/scamper/main.go
 RUN chmod -R a+rx /go/bin/sidestream
 
 CMD ["/go/bin/sidestream"]
