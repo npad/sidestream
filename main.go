@@ -17,7 +17,7 @@ import (
 )
 
 var SCAMPER_BIN = "/usr/local/bin/scamper"
-var OUTPUT_PATH = "./scamper_output/"
+var OUTPUT_PATH = "/var/spool/scamper"
 
 type Connection struct {
 	remote_ip   string

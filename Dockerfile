@@ -6,9 +6,6 @@ RUN apt-get update && apt-get install -y python python-pip make iproute2 coreuti
 ADD requirements.txt /requirements.txt
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt -U
-# Install scraper
-ADD scamper.py /scamper.py
-RUN chmod +x /scamper.py
 
 RUN mkdir /source
 ADD source/scamper-cvs-20190113 /source/
@@ -22,4 +19,11 @@ RUN make install
 RUN chmod +x /usr/local/bin/scamper
 RUN chmod 4755 /usr/local/bin/scamper
 
-CMD ["python", "/scamper.py", "--logpath", "/var/spool/scamper"]
+FROM golang:alpine as build
+
+RUN apk update && apk add bash git pkgconfig
+ADD . /go/src/github.com/npad/sidestream/blob/scamper
+RUN go get github.com/npad/sidestream/blob/scamper
+RUN chmod -R a+rx /go/bin/sidestream
+
+CMD ["/go/bin/sidestream"]
